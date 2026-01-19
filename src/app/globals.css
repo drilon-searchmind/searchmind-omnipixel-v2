@@ -32,5 +32,5 @@
 body {
 	background-color: var(--color-background);
 	color: var(--color-foreground);
-	font-family: var(--font-geist-sans);
+	font-family: var(--font-outfit), var(--font-geist-sans), sans-serif;
 }
