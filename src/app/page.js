@@ -5,7 +5,7 @@ export default function Home() {
 		<div className="flex min-h-screen items-center justify-center">
 			<main className="w-full max-w-[1600px] space-y-8">
 				<div className="space-y-2 text-center">
-					<h1 className="text-7xl font-bold tracking-tight">
+					<h1 className="text-7xl font-bold tracking-tight text-primary">
 						Searchmind <br />
 						Omnipixel
 					</h1>

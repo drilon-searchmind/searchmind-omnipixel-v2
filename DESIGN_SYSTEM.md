@@ -134,6 +134,29 @@ import {
 </Card>
 ```
 
+### UrlScanner
+
+URL scanning form component with built-in navigation and loading states.
+
+**Location**: `src/components/url-scanner.jsx`
+
+**Features**:
+- Input validation for URLs
+- Loading state management
+- Automatic navigation to scan page
+- Responsive design
+
+**Usage**:
+```jsx
+import { UrlScanner } from "@/components/url-scanner";
+
+// Basic usage
+<UrlScanner />
+
+// With custom submit handler
+<UrlScanner onSubmit={(url) => console.log("Custom handler:", url)} />
+```
+
 ## Utilities
 
 ### `cn()` Function
