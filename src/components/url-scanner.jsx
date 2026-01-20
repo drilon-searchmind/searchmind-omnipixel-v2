@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 export function UrlScanner({ className, onSubmit }) {
     const [url, setUrl] = React.useState("");
     const [isLoading, setIsLoading] = React.useState(false);
+    const router = useRouter();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -15,11 +17,12 @@ export function UrlScanner({ className, onSubmit }) {
 
         setIsLoading(true);
         try {
+            // Navigate to scan page with URL parameter
+            router.push(`/scan?url=${encodeURIComponent(url.trim())}`);
+
+            // If custom onSubmit is provided, call it too
             if (onSubmit) {
                 await onSubmit(url);
-            } else {
-                // Default behavior - you can customize this
-                console.log("Scanning URL:", url);
             }
         } catch (error) {
             console.error("Error scanning URL:", error);
