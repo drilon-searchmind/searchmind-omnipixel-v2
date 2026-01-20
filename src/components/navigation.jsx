@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -20,8 +21,15 @@ export function Navigation() {
 				<div className="flex h-16 items-center justify-between">
 					{/* Logo */}
 					<div className="flex items-center">
-						<a href="/" className="text-xl font-semibold tracking-tight">
-							Omnipixel
+						<a href="/" className="flex items-center gap-1 text-xl font-semibold tracking-tight">
+							<Image
+								src="/images/tagstackLogo2NoBG.png"
+								alt="Tagstack Logo"
+								width={32}
+								height={32}
+								className="object-contain"
+							/>
+							<span>Omnipixel</span>
 						</a>
 					</div>
 
