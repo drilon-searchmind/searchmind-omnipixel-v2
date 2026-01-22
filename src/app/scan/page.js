@@ -9,9 +9,8 @@ const SCAN_STEPS = [
     { id: 1, title: "Initializing Scanner", description: "Setting up scanning environment" },
     { id: 2, title: "Navigating to URL", description: "Connecting to the target website" },
     { id: 3, title: "Waiting for Page Load", description: "Allowing page to load completely" },
-    { id: 4, title: "Detecting Cookie Banners", description: "Looking for cookie consent dialogs" },
-    { id: 5, title: "Accepting Cookies", description: "Automatically accepting cookie consent" },
-    { id: 6, title: "Analyzing Tracking Data", description: "Scanning for tracking pixels and scripts" },
+    { id: 4, title: "Accepting Cookies", description: "Automatically accepting cookie consent" },
+    { id: 5, title: "Analyzing Tracking Data", description: "Scanning for tracking pixels and scripts" },
 ];
 
 function ScanContent() {
@@ -80,16 +79,8 @@ function ScanContent() {
                 throw new Error(scanResults.data?.error || scanResults.message || 'Scanning failed');
             }
 
-            // Steps 2-3 completed via API
-            setCurrentStep(4);
-
-            // Step 4: Detect cookie banners (simulate)
-            await delay(1000);
+            // Steps 2-4 completed via API (includes cookie acceptance)
             setCurrentStep(5);
-
-            // Step 5: Accept cookies (simulate)
-            await delay(1500);
-            setCurrentStep(6);
 
             // Step 6: Analyze tracking data (simulate)
             await delay(2000);

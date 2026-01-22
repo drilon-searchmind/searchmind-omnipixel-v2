@@ -188,6 +188,155 @@ class WebsiteScanner {
     hasPage() {
         return this.page !== null;
     }
+
+    /**
+     * Accept cookies using text-based detection within cookie containers
+     * This approach is more robust than provider-specific detection
+     */
+    async acceptCookies() {
+        try {
+            if (!this.page) {
+                return {
+                    success: false,
+                    message: 'No page loaded'
+                };
+            }
+
+            console.log('Attempting to accept cookies using text-based detection...');
+
+            // Wait a moment for any cookie banners to load
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const result = await this.page.evaluate(() => {
+                // Helper function to find elements containing specific text patterns
+                function findAcceptElements(selector, textPatterns) {
+                    const elements = document.querySelectorAll(selector);
+                    return Array.prototype.filter.call(elements, function(element) {
+                        const text = element.textContent.trim();
+                        return textPatterns.some(pattern => {
+                            return new RegExp(pattern, "i").test(text);
+                        });
+                    });
+                }
+
+                // Common accept button text patterns in multiple languages
+                const acceptPatterns = [
+                    // English
+                    'accept all', 'accept', 'accept cookies', 'allow all', 'allow', 'allow cookies',
+                    'i accept', 'i agree', 'ok', 'okay', 'yes', 'agree', 'consent',
+                    // Danish (for pompdelux.dk)
+                    'tillad alle', 'tillad', 'accepter alle', 'accepter', 'ok', 'ja',
+                    'jeg accepterer', 'jeg accepterer alle',
+                    // German
+                    'alle akzeptieren', 'akzeptieren', 'verstanden', 'zustimmen', 'okay', 'ok', 'ja',
+                    // French
+                    'accepter tout', 'accepter', 'tous accepter', 'd\'accord', 'ok', 'oui', 'j\'accepte',
+                    // Spanish
+                    'aceptar todo', 'aceptar', 'todo aceptar', 'de acuerdo', 'ok', 'sí', 'acepto',
+                    // Italian
+                    'accetta tutto', 'accetta', 'tutto accettare', 'ok', 'va bene', 'sì', 'accetto',
+                    // Dutch
+                    'alles accepteren', 'accepteren', 'akkoord', 'ok', 'ja', 'ik accepteer',
+                    // Swedish
+                    'acceptera alla', 'acceptera', 'alla acceptera', 'ok', 'ja', 'jag accepterar',
+                    // Norwegian
+                    'godta alle', 'godta', 'aksepter', 'ok', 'ja', 'jeg godtar'
+                ];
+
+                // Target buttons and links within cookie-related containers
+                const selectors = [
+                    '[id*=cookie] button',
+                    '[class*=cookie] button',
+                    '[id*=consent] button',
+                    '[class*=consent] button',
+                    '[id*=gdpr] button',
+                    '[class*=gdpr] button',
+                    '[id*=cookie] a',
+                    '[class*=cookie] a',
+                    '[id*=consent] a',
+                    '[class*=consent] a',
+                    '[id*=gdpr] a',
+                    '[class*=gdpr] a',
+                    // CookieInformation specific
+                    '[class*=coi-] button',
+                    '[id*=coi] button',
+                    '[class*=coi-] a',
+                    '[id*=coi] a'
+                ];
+
+                // Try each selector
+                for (const selector of selectors) {
+                    try {
+                        const elements = document.querySelectorAll(selector);
+                        for (const element of elements) {
+                            const text = element.textContent.trim();
+                            // Check if text matches any accept pattern
+                            const matchesPattern = acceptPatterns.some(pattern =>
+                                new RegExp(pattern, "i").test(text)
+                            );
+
+                            if (matchesPattern) {
+                                // Check if element is visible and clickable
+                                const style = window.getComputedStyle(element);
+                                const isVisible = style.display !== 'none' &&
+                                                style.visibility !== 'hidden' &&
+                                                style.opacity !== '0' &&
+                                                element.offsetParent !== null;
+
+                                if (isVisible) {
+                                    console.log('Found accept button:', selector, text);
+                                    element.click();
+                                    return {
+                                        success: true,
+                                        element: {
+                                            tagName: element.tagName,
+                                            id: element.id,
+                                            className: element.className,
+                                            text: text.substring(0, 50)
+                                        },
+                                        selector: selector,
+                                        method: 'text-based'
+                                    };
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Error checking selector:', selector, e.message);
+                    }
+                }
+
+                return { success: false, message: 'No clickable accept elements found' };
+            });
+
+            if (result.success) {
+                console.log('Successfully accepted cookies using text-based detection');
+                return {
+                    success: true,
+                    provider: 'Text-based detection',
+                    message: `Accepted cookies: "${result.element.text}"`,
+                    element: result.element,
+                    method: 'text-based'
+                };
+            } else {
+                console.log('Text-based detection found no accept buttons');
+                return {
+                    success: false,
+                    provider: null,
+                    message: 'No cookie accept buttons found using text-based detection',
+                    method: 'text-based'
+                };
+            }
+
+        } catch (error) {
+            console.error('Error in cookie acceptance:', error);
+            return {
+                success: false,
+                provider: null,
+                message: `Error accepting cookies: ${error.message}`,
+                method: 'text-based'
+            };
+        }
+    }
 }
 
 /**
@@ -256,7 +405,28 @@ export async function executeInitialScan(url, onProgress = () => {}) {
         });
         console.log('Step 3 completed successfully');
 
-        // Get page info
+        // Step 4: Accept Cookies
+        console.log('Executing step 4: Accept cookies');
+        onProgress(4, 'Accepting cookies...');
+        const cookieResult = await scanner.acceptCookies();
+
+        results.steps.push({
+            id: 4,
+            status: 'completed',
+            result: cookieResult
+        });
+        console.log('Step 4 completed:', cookieResult.success ? 'Cookies accepted' : 'No cookies to accept');
+
+        // Store cookie information in results
+        results.cookieInfo = {
+            detected: cookieResult.success,
+            provider: cookieResult.provider || null,
+            accepted: cookieResult.success,
+            message: cookieResult.message,
+            method: cookieResult.method || 'unknown'
+        };
+
+        // Get page info (after potential cookie acceptance)
         console.log('Getting page information...');
         const pageInfo = await scanner.getPageInfo();
         if (pageInfo.success) {

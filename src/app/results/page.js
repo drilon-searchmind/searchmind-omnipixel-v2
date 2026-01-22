@@ -95,8 +95,16 @@ function ResultsContent() {
                         speedIndex: 2.8,
                         timeToInteractive: 2.5
                     },
-                    cookiesAccepted: true,
-                    cookieProvider: "Cookiebot",
+                    cookieInfo: {
+                        accepted: true,
+                        provider: "Text-based detection",
+                        message: "Accepted cookies: \"Accepter alle\"",
+                        method: "text-based",
+                        element: {
+                            text: "Accepter alle",
+                            tagName: "BUTTON"
+                        }
+                    },
                     gtmAnalysis: {
                         containers: [],
                         triggers: [],
@@ -176,8 +184,16 @@ function ResultsContent() {
                 timeToInteractive: 2.5
             },
 
-            cookiesAccepted: true,
-            cookieProvider: "Cookiebot",
+            cookieInfo: {
+                accepted: true,
+                provider: "Text-based detection",
+                message: "Accepted cookies: \"Accepter alle\"",
+                method: "text-based",
+                element: {
+                    text: "Accepter alle",
+                    tagName: "BUTTON"
+                }
+            },
 
             // GTM Analysis placeholder (to be implemented)
             gtmAnalysis: {
@@ -567,22 +583,48 @@ function ResultsContent() {
                             Privacy & Cookies
                         </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
+                        {/* Cookie Acceptance Status */}
                         <div className="flex items-center justify-between p-4 border rounded-lg">
                             <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${results.cookiesAccepted ? 'bg-accent' : 'bg-destructive'}`}></div>
+                                <div className={`w-3 h-3 rounded-full ${
+                                    results.cookieInfo?.accepted ? 'bg-accent' :
+                                    results.cookieInfo?.accepted === false ? 'bg-destructive' : 'bg-muted'
+                                }`}></div>
                                 <div>
-                                    <div className="font-medium">Cookie Consent</div>
+                                    <div className="font-medium">Cookie Acceptance</div>
                                     <div className="text-sm text-muted-foreground">
-                                        {results.cookiesAccepted ? 'Automatically accepted' : 'Manual consent required'}
+                                        {results.cookieInfo?.accepted ?
+                                            `Cookies automatically accepted using ${results.cookieInfo.method || 'text-based detection'}` :
+                                            results.cookieInfo?.message || 'Unable to accept cookies automatically'
+                                        }
                                     </div>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className="font-medium">{results.cookieProvider}</div>
-                                <div className="text-sm text-muted-foreground">Cookie Provider</div>
+                                <div className={`text-sm font-medium ${
+                                    results.cookieInfo?.accepted ? 'text-accent' :
+                                    results.cookieInfo?.accepted === false ? 'text-destructive' : 'text-muted-foreground'
+                                }`}>
+                                    {results.cookieInfo?.accepted ? 'Accepted' :
+                                     results.cookieInfo?.accepted === false ? 'Failed' : 'Unknown'}
+                                </div>
                             </div>
                         </div>
+
+                        {/* Cookie Details */}
+                        {results.cookieInfo?.provider && (
+                            <div className="p-3 bg-muted rounded-lg">
+                                <div className="text-sm">
+                                    <strong>Detection Method:</strong> {results.cookieInfo.provider}
+                                </div>
+                                {results.cookieInfo.element && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                        Button found: "{results.cookieInfo.element.text}"
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
