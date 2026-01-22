@@ -34,33 +34,69 @@ function ScanContent() {
 
     const startScanning = async (targetUrl) => {
         try {
+            // Step 1: Initialize (simulate)
             setCurrentStep(1);
+            await delay(500);
 
-            // Step 1: Initialize
-            await delay(1000);
+            // Step 2: Navigate to URL (call API)
             setCurrentStep(2);
 
-            // Step 2: Navigate to URL (simulate)
-            await delay(1500);
-            setCurrentStep(3);
+            let response;
+            try {
+                console.log('Making API call to /api/scan with URL:', targetUrl);
+                response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: targetUrl }),
+                });
 
-            // Step 3: Wait for page load
-            await delay(2000);
+                console.log('API response received:', response);
+                console.log('API response status:', response.status);
+                console.log('API response ok:', response.ok);
+                console.log('API response type:', typeof response);
+            } catch (fetchError) {
+                console.error('Fetch error:', fetchError);
+                throw new Error(`Network error: ${fetchError.message}`);
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API error response:', errorText);
+                throw new Error(`API returned ${response.status}: ${errorText}`);
+            }
+
+            let scanResults;
+            try {
+                scanResults = await response.json();
+                console.log('Scan results:', scanResults);
+            } catch (jsonError) {
+                console.error('JSON parse error:', jsonError);
+                throw new Error(`Failed to parse API response: ${jsonError.message}`);
+            }
+
+            if (!scanResults.success) {
+                throw new Error(scanResults.data?.error || scanResults.message || 'Scanning failed');
+            }
+
+            // Steps 2-3 completed via API
             setCurrentStep(4);
 
-            // Step 4: Detect cookie banners
+            // Step 4: Detect cookie banners (simulate)
             await delay(1000);
             setCurrentStep(5);
 
-            // Step 5: Accept cookies
+            // Step 5: Accept cookies (simulate)
             await delay(1500);
             setCurrentStep(6);
 
-            // Step 6: Analyze tracking data
+            // Step 6: Analyze tracking data (simulate)
             await delay(2000);
 
-            // Complete - redirect to results
-            router.push(`/results?url=${encodeURIComponent(targetUrl)}`);
+            // Complete - redirect to results with scan data
+            const resultsUrl = `/results?url=${encodeURIComponent(targetUrl)}&scanData=${encodeURIComponent(JSON.stringify(scanResults.data))}`;
+            router.push(resultsUrl);
 
         } catch (err) {
             setError(err.message);

@@ -22,6 +22,7 @@ function ResultsContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const url = searchParams.get("url");
+    const scanDataParam = searchParams.get("scanData");
 
     const [results, setResults] = useState(null);
 
@@ -29,6 +30,85 @@ function ResultsContent() {
         if (!url) {
             router.push("/");
             return;
+        }
+
+        // Check if we have real scan data from the scanner
+        if (scanDataParam) {
+            try {
+                const scanData = JSON.parse(decodeURIComponent(scanDataParam));
+                // Merge real scan data with mock results
+                setResults({
+                    url: url,
+                    scannedAt: new Date().toISOString(),
+                    // Use real page info if available
+                    pageInfo: scanData.pageInfo || null,
+                    // Keep mock data for other sections (will be replaced later)
+                    consentModeV2: true,
+                    serverSideTracking: false,
+                    marketingScripts: {
+                        gtm: {
+                            found: true,
+                            containerId: "GTM-XXXXXXX",
+                            version: "v2",
+                            lastUpdated: "2024-01-15"
+                        },
+                        ga4: {
+                            found: true,
+                            measurementId: "G-XXXXXXXXXX",
+                            enhancedEcommerce: true,
+                            crossDomainTracking: false
+                        },
+                        meta: {
+                            found: true,
+                            pixelId: "123456789012345",
+                            conversionsApi: true,
+                            customAudiences: true
+                        },
+                        tiktok: {
+                            found: true,
+                            pixelId: "XXXXXXXXXXXXXXX",
+                            eventsApi: false
+                        },
+                        linkedin: {
+                            found: false,
+                            pixelId: null
+                        },
+                        googleAds: {
+                            found: true,
+                            conversionId: "AW-XXXXXXXXX",
+                            remarketing: true
+                        }
+                    },
+                    scores: {
+                        privacy: 85,
+                        performance: 78,
+                        tracking: 92,
+                        compliance: 88
+                    },
+                    performance: {
+                        loadTime: 2.3,
+                        firstContentfulPaint: 1.2,
+                        largestContentfulPaint: 3.1,
+                        firstInputDelay: 45,
+                        cumulativeLayoutShift: 0.08,
+                        totalBlockingTime: 120,
+                        speedIndex: 2.8,
+                        timeToInteractive: 2.5
+                    },
+                    cookiesAccepted: true,
+                    cookieProvider: "Cookiebot",
+                    gtmAnalysis: {
+                        containers: [],
+                        triggers: [],
+                        variables: [],
+                        tags: []
+                    }
+                });
+                return;
+            } catch (error) {
+                console.warn('Failed to parse scan data:', error);
+                // Fall back to mock data
+            }
         }
 
         // Enhanced mock results with new technical structure
@@ -165,6 +245,45 @@ function ResultsContent() {
                         </Button>
                     </div>
                 </div>
+
+                {/* Real Scan Data Display */}
+                {results.pageInfo && (
+                    <Card className="bg-blue-50 border-blue-200">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <FaTachometerAlt className="w-5 h-5 text-blue-600" />
+                                Live Scan Results
+                            </CardTitle>
+                            <CardDescription>
+                                Real data captured from the scanned website
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-blue-600">{results.pageInfo.scripts}</div>
+                                    <div className="text-sm text-muted-foreground">Scripts Found</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-blue-600">{results.pageInfo.links}</div>
+                                    <div className="text-sm text-muted-foreground">Links Found</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-blue-600">{results.pageInfo.images}</div>
+                                    <div className="text-sm text-muted-foreground">Images Found</div>
+                                </div>
+                            </div>
+                            <div className="mt-4 p-3 bg-white rounded border">
+                                <div className="text-sm">
+                                    <strong>Page Title:</strong> {results.pageInfo.title || 'N/A'}
+                                </div>
+                                <div className="text-sm mt-1">
+                                    <strong>Cookies:</strong> {results.pageInfo.cookies || 0}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Overall Score & Status */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-20 mb-20">

@@ -157,6 +157,51 @@ import { UrlScanner } from "@/components/url-scanner";
 <UrlScanner onSubmit={(url) => console.log("Custom handler:", url)} />
 ```
 
+## Scanning System
+
+### WebsiteScanner Class
+
+Modular browser automation class for website scanning.
+
+**Location**: `src/lib/scanner.js`
+
+**Features**:
+- Puppeteer-based browser automation
+- Headless Chrome operations
+- Modular step execution
+- Error handling and cleanup
+
+**Usage**:
+```javascript
+import { executeInitialScan } from '@/lib/scanner';
+
+const results = await executeInitialScan('https://example.com', (step, message) => {
+    console.log(`Step ${step}: ${message}`);
+});
+```
+
+### Scan API Route
+
+Server-side API endpoint for website scanning.
+
+**Location**: `src/app/api/scan/route.js`
+
+**Features**:
+- POST endpoint for URL scanning
+- Server-side Puppeteer execution
+- JSON response format
+- Error handling
+
+**Usage**:
+```javascript
+const response = await fetch('/api/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: 'https://example.com' })
+});
+const data = await response.json();
+```
+
 ## Utilities
 
 ### `cn()` Function
