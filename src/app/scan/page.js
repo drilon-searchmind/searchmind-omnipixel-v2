@@ -80,6 +80,11 @@ function ScanContent() {
             }
 
             // Steps 2-4 completed via API (includes cookie acceptance)
+            // Add visual progression for remaining steps
+            setCurrentStep(3);
+            await delay(500);
+            setCurrentStep(4);
+            await delay(500);
             setCurrentStep(5);
 
             // Step 6: Analyze tracking data (simulate)

@@ -190,8 +190,8 @@ class WebsiteScanner {
     }
 
     /**
-     * Accept cookies using text-based detection within cookie containers
-     * This approach is more robust than provider-specific detection
+     * Accept cookies and detect CMP provider with enhanced information
+     * This approach detects specific CMP providers and extracts detailed cookie data
      */
     async acceptCookies() {
         try {
@@ -202,23 +202,12 @@ class WebsiteScanner {
                 };
             }
 
-            console.log('Attempting to accept cookies using text-based detection...');
+            console.log('Attempting to accept cookies and detect CMP provider...');
 
             // Wait a moment for any cookie banners to load
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             const result = await this.page.evaluate(() => {
-                // Helper function to find elements containing specific text patterns
-                function findAcceptElements(selector, textPatterns) {
-                    const elements = document.querySelectorAll(selector);
-                    return Array.prototype.filter.call(elements, function(element) {
-                        const text = element.textContent.trim();
-                        return textPatterns.some(pattern => {
-                            return new RegExp(pattern, "i").test(text);
-                        });
-                    });
-                }
-
                 // Common accept button text patterns in multiple languages
                 const acceptPatterns = [
                     // English
@@ -243,26 +232,216 @@ class WebsiteScanner {
                     'godta alle', 'godta', 'aksepter', 'ok', 'ja', 'jeg godtar'
                 ];
 
-                // Target buttons and links within cookie-related containers
+                // Detect CMP providers
+                const cmpDetection = {
+                    // CookieInformation (coi- prefix)
+                    cookieinformation: () => {
+                        const coiElements = document.querySelectorAll('[class*="coi-"], [id*="coi"]');
+                        const coiScripts = Array.from(document.querySelectorAll('script')).filter(s =>
+                            s.src && s.src.includes('cookieinformation')
+                        );
+                        if (coiElements.length > 0 || coiScripts.length > 0) {
+                            return {
+                                name: 'CookieInformation',
+                                confidence: 'high',
+                                elements: coiElements.length,
+                                scripts: coiScripts.length,
+                                version: coiScripts.length > 0 ? 'Script detected' : 'Banner detected'
+                            };
+                        }
+                        return null;
+                    },
+
+                    // OneTrust
+                    onetrust: () => {
+                        const otElements = document.querySelectorAll('[class*="onetrust"], [id*="onetrust"], #onetrust-banner-sdk');
+                        const otScripts = Array.from(document.querySelectorAll('script')).filter(s =>
+                            s.src && (s.src.includes('onetrust') || s.src.includes('cookiepro'))
+                        );
+                        if (otElements.length > 0 || otScripts.length > 0) {
+                            return {
+                                name: 'OneTrust',
+                                confidence: 'high',
+                                elements: otElements.length,
+                                scripts: otScripts.length,
+                                version: otScripts.length > 0 ? 'Enterprise' : 'Standard'
+                            };
+                        }
+                        return null;
+                    },
+
+                    // Cookiebot
+                    cookiebot: () => {
+                        const cbElements = document.querySelectorAll('[class*="cookiebot"], [id*="cookiebot"], #CybotCookiebotDialog');
+                        const cbScripts = Array.from(document.querySelectorAll('script')).filter(s =>
+                            s.src && s.src.includes('cookiebot')
+                        );
+                        if (cbElements.length > 0 || cbScripts.length > 0) {
+                            return {
+                                name: 'Cookiebot',
+                                confidence: 'high',
+                                elements: cbElements.length,
+                                scripts: cbScripts.length,
+                                version: cbScripts.length > 0 ? 'Cloud' : 'On-premise'
+                            };
+                        }
+                        return null;
+                    },
+
+                    // Termly
+                    termly: () => {
+                        const termlyElements = document.querySelectorAll('[class*="termly"], [id*="termly"]');
+                        const termlyScripts = Array.from(document.querySelectorAll('script')).filter(s =>
+                            s.src && s.src.includes('termly')
+                        );
+                        if (termlyElements.length > 0 || termlyScripts.length > 0) {
+                            return {
+                                name: 'Termly',
+                                confidence: 'high',
+                                elements: termlyElements.length,
+                                scripts: termlyScripts.length
+                            };
+                        }
+                        return null;
+                    },
+
+                    // CookieYes
+                    cookieyes: () => {
+                        const cyElements = document.querySelectorAll('[class*="cookieyes"], [id*="cookieyes"]');
+                        const cyScripts = Array.from(document.querySelectorAll('script')).filter(s =>
+                            s.src && s.src.includes('cookieyes')
+                        );
+                        if (cyElements.length > 0 || cyScripts.length > 0) {
+                            return {
+                                name: 'CookieYes',
+                                confidence: 'high',
+                                elements: cyElements.length,
+                                scripts: cyScripts.length
+                            };
+                        }
+                        return null;
+                    },
+
+                    // GDPR Cookie Compliance (WordPress)
+                    gdprCookieCompliance: () => {
+                        const gdprElements = document.querySelectorAll('.gdpr-cookie-compliance-modal, [class*="gdpr"]');
+                        if (gdprElements.length > 0) {
+                            return {
+                                name: 'GDPR Cookie Compliance',
+                                confidence: 'medium',
+                                elements: gdprElements.length,
+                                scripts: 0,
+                                platform: 'WordPress'
+                            };
+                        }
+                        return null;
+                    },
+
+                    // Generic cookie banner detection
+                    generic: () => {
+                        const cookieElements = document.querySelectorAll('[class*="cookie"], [id*="cookie"], [class*="consent"], [id*="consent"], [class*="gdpr"], [id*="gdpr"]');
+                        const cookieScripts = Array.from(document.querySelectorAll('script')).filter(s =>
+                            s.src && (s.src.includes('cookie') || s.src.includes('consent') || s.src.includes('gdpr'))
+                        );
+
+                        // Look for common cookie banner patterns
+                        const bannerPatterns = [
+                            /cookie.*banner/i,
+                            /cookie.*consent/i,
+                            /gdpr.*banner/i,
+                            /privacy.*banner/i
+                        ];
+
+                        let bannerFound = false;
+                        for (const element of cookieElements) {
+                            const text = element.textContent || '';
+                            const html = element.innerHTML || '';
+                            if (bannerPatterns.some(pattern => pattern.test(text) || pattern.test(html))) {
+                                bannerFound = true;
+                                break;
+                            }
+                        }
+
+                        if (bannerFound || cookieElements.length > 3 || cookieScripts.length > 0) {
+                            return {
+                                name: 'Generic Cookie Banner',
+                                confidence: 'low',
+                                elements: cookieElements.length,
+                                scripts: cookieScripts.length
+                            };
+                        }
+                        return null;
+                    }
+                };
+
+                // Try to identify CMP provider
+                let detectedCMP = null;
+                const cmpKeys = Object.keys(cmpDetection);
+                for (const key of cmpKeys) {
+                    const result = cmpDetection[key]();
+                    if (result) {
+                        detectedCMP = result;
+                        break;
+                    }
+                }
+
+                // Get cookie information
+                const cookies = document.cookie ? document.cookie.split(';').length : 0;
+                const cookieKeys = document.cookie ? document.cookie.split(';').map(c => c.split('=')[0].trim()) : [];
+                const cookieDomains = document.cookie ? [...new Set(document.cookie.split(';').map(c => {
+                    const parts = c.split('=');
+                    return parts.length > 1 ? parts[0].trim() : '';
+                }).filter(c => c))].length : 0;
+
+                // Enhanced selectors for common cookie banners
                 const selectors = [
-                    '[id*=cookie] button',
-                    '[class*=cookie] button',
-                    '[id*=consent] button',
-                    '[class*=consent] button',
-                    '[id*=gdpr] button',
-                    '[class*=gdpr] button',
-                    '[id*=cookie] a',
-                    '[class*=cookie] a',
-                    '[id*=consent] a',
-                    '[class*=consent] a',
-                    '[id*=gdpr] a',
-                    '[class*=gdpr] a',
-                    // CookieInformation specific
-                    '[class*=coi-] button',
-                    '[id*=coi] button',
-                    '[class*=coi-] a',
-                    '[id*=coi] a'
-                ];
+                    // CMP-specific selectors (prioritize these)
+                    ...(detectedCMP ? [
+                        // CookieInformation
+                        detectedCMP.name === 'CookieInformation' ? [
+                            '[class*="coi-banner"] button[class*="accept"]',
+                            '[class*="coi-consent"] button[class*="accept"]',
+                            '[id*="coi"] button[class*="accept"]',
+                            '[class*="coi-banner"] a[class*="accept"]',
+                            '[class*="coi-consent"] a[class*="accept"]'
+                        ] : [],
+
+                        // OneTrust
+                        detectedCMP.name === 'OneTrust' ? [
+                            '#onetrust-accept-btn-handler',
+                            '[class*="onetrust"] button[class*="accept"]',
+                            '#onetrust-banner-sdk button[class*="accept"]'
+                        ] : [],
+
+                        // Cookiebot
+                        detectedCMP.name === 'Cookiebot' ? [
+                            '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowallSelection',
+                            '[class*="cookiebot"] button[class*="accept"]',
+                            '#cookiebot button[class*="accept"]'
+                        ] : []
+                    ].flat() : []),
+
+                    // Generic selectors
+                    'button[class*="accept"]',
+                    'button[class*="agree"]',
+                    'button[class*="consent"]',
+                    'a[class*="accept"]',
+                    'a[class*="agree"]',
+                    'button[id*="accept"]',
+                    'button[id*="agree"]',
+                    'a[id*="accept"]',
+                    'a[id*="agree"]',
+
+                    // General
+                    'button',
+                    'a',
+
+                    // Fallback selectors
+                    '[class*="cookie"] button',
+                    '[id*="cookie"] button',
+                    '[class*="consent"] button',
+                    '[id*="consent"] button'
+                ].flat();
 
                 // Try each selector
                 for (const selector of selectors) {
@@ -295,7 +474,13 @@ class WebsiteScanner {
                                             text: text.substring(0, 50)
                                         },
                                         selector: selector,
-                                        method: 'text-based'
+                                        method: detectedCMP ? 'cmp-specific' : 'text-based',
+                                        cmp: detectedCMP,
+                                        cookies: {
+                                            count: cookies,
+                                            keys: cookieKeys.slice(0, 10), // Limit to first 10 for privacy
+                                            domains: cookieDomains
+                                        }
                                     };
                                 }
                             }
@@ -305,25 +490,46 @@ class WebsiteScanner {
                     }
                 }
 
-                return { success: false, message: 'No clickable accept elements found' };
+                return {
+                    success: false,
+                    message: 'No clickable accept elements found',
+                    cmp: detectedCMP,
+                    cookies: {
+                        count: cookies,
+                        keys: cookieKeys.slice(0, 10),
+                        domains: cookieDomains
+                    }
+                };
             });
 
             if (result.success) {
-                console.log('Successfully accepted cookies using text-based detection');
+                console.log('Successfully accepted cookies');
+                const cmpName = result.cmp ? result.cmp.name : 'Text-based detection';
+                const message = `Accepted cookies using ${result.method} detection${result.cmp ? ` (${result.cmp.name})` : ''}: "${result.element.text}"`;
+
                 return {
                     success: true,
-                    provider: 'Text-based detection',
-                    message: `Accepted cookies: "${result.element.text}"`,
+                    provider: cmpName,
+                    message: message,
                     element: result.element,
-                    method: 'text-based'
+                    method: result.method,
+                    cmp: result.cmp,
+                    cookies: result.cookies
                 };
             } else {
-                console.log('Text-based detection found no accept buttons');
+                console.log('Cookie acceptance detection found no accept buttons');
+                const cmpName = result.cmp ? result.cmp.name : null;
+                const message = cmpName
+                    ? `Detected ${cmpName} CMP but no accept buttons found`
+                    : 'No cookie accept buttons found using available detection methods';
+
                 return {
                     success: false,
-                    provider: null,
-                    message: 'No cookie accept buttons found using text-based detection',
-                    method: 'text-based'
+                    provider: cmpName,
+                    message: message,
+                    method: result.method || 'text-based',
+                    cmp: result.cmp,
+                    cookies: result.cookies
                 };
             }
 
@@ -333,7 +539,9 @@ class WebsiteScanner {
                 success: false,
                 provider: null,
                 message: `Error accepting cookies: ${error.message}`,
-                method: 'text-based'
+                method: 'text-based',
+                cmp: null,
+                cookies: { count: 0, keys: [], domains: 0 }
             };
         }
     }
@@ -423,7 +631,10 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             provider: cookieResult.provider || null,
             accepted: cookieResult.success,
             message: cookieResult.message,
-            method: cookieResult.method || 'unknown'
+            method: cookieResult.method || 'unknown',
+            cmp: cookieResult.cmp || null,
+            element: cookieResult.element || null,
+            cookies: cookieResult.cookies || null
         };
 
         // Get page info (after potential cookie acceptance)

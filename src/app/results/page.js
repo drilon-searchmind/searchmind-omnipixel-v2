@@ -42,6 +42,8 @@ function ResultsContent() {
                     scannedAt: new Date().toISOString(),
                     // Use real page info if available
                     pageInfo: scanData.pageInfo || null,
+                    // Use real cookie info from scan
+                    cookieInfo: scanData.cookieInfo || null,
                     // Keep mock data for other sections (will be replaced later)
                     consentModeV2: true,
                     serverSideTracking: false,
@@ -95,16 +97,6 @@ function ResultsContent() {
                         speedIndex: 2.8,
                         timeToInteractive: 2.5
                     },
-                    cookieInfo: {
-                        accepted: true,
-                        provider: "Text-based detection",
-                        message: "Accepted cookies: \"Accepter alle\"",
-                        method: "text-based",
-                        element: {
-                            text: "Accepter alle",
-                            tagName: "BUTTON"
-                        }
-                    },
                     gtmAnalysis: {
                         containers: [],
                         triggers: [],
@@ -117,6 +109,11 @@ function ResultsContent() {
                 console.warn('Failed to parse scan data:', error);
                 // Fall back to mock data
             }
+        } else {
+            // No scan data provided - redirect to scan page
+            console.log('No scan data provided, redirecting to scan page');
+            router.push('/');
+            return;
         }
 
         // Enhanced mock results with new technical structure
@@ -182,17 +179,6 @@ function ResultsContent() {
                 totalBlockingTime: 120,
                 speedIndex: 2.8,
                 timeToInteractive: 2.5
-            },
-
-            cookieInfo: {
-                accepted: true,
-                provider: "Text-based detection",
-                message: "Accepted cookies: \"Accepter alle\"",
-                method: "text-based",
-                element: {
-                    text: "Accepter alle",
-                    tagName: "BUTTON"
-                }
             },
 
             // GTM Analysis placeholder (to be implemented)
@@ -612,15 +598,153 @@ function ResultsContent() {
                             </div>
                         </div>
 
-                        {/* Cookie Details */}
-                        {results.cookieInfo?.provider && (
-                            <div className="p-3 bg-muted rounded-lg">
-                                <div className="text-sm">
-                                    <strong>Detection Method:</strong> {results.cookieInfo.provider}
+                        {/* Enhanced Cookie Details */}
+                        {results.cookieInfo && (
+                            <div className="p-4 bg-muted rounded-lg space-y-4">
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {/* CMP Detection */}
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                            CMP Provider
+                                        </div>
+                                        <div className="text-sm font-medium mt-1">
+                                            {results.cookieInfo.cmp ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span>{results.cookieInfo.cmp.name}</span>
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${
+                                                        results.cookieInfo.cmp.confidence === 'high'
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : results.cookieInfo.cmp.confidence === 'medium'
+                                                            ? 'bg-yellow-100 text-yellow-800'
+                                                            : 'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                        {results.cookieInfo.cmp.confidence || 'unknown'}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                results.cookieInfo.provider === 'Text-based detection' ? 'Auto-detected' : results.cookieInfo.provider || 'Unknown'
+                                            )}
+                                        </div>
+                                        {results.cookieInfo.cmp?.version && (
+                                            <div className="text-xs text-muted-foreground">
+                                                Version: {results.cookieInfo.cmp.version}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Detection Method */}
+                                    <div>
+                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                            Detection Method
+                                        </div>
+                                        <div className="text-sm font-medium mt-1">
+                                            {results.cookieInfo.method === 'cmp-specific' ? 'CMP-Specific' : 'Text-Based'}
+                                        </div>
+                                        {results.cookieInfo.cmp && (
+                                            <div className="text-xs text-muted-foreground mt-1">
+                                                {results.cookieInfo.cmp.elements || 0} elements, {results.cookieInfo.cmp.scripts || 0} scripts detected
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Cookie Statistics */}
+                                    {results.cookieInfo.cookies && (
+                                        <>
+                                            <div>
+                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                                    Cookies Found
+                                                </div>
+                                                <div className="text-sm font-medium mt-1">
+                                                    {results.cookieInfo.cookies.count} total cookies
+                                                </div>
+                                                {results.cookieInfo.cookies.domains && results.cookieInfo.cookies.domains > 0 && (
+                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                        {results.cookieInfo.cookies.domains} domains
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                                    Cookie Categories
+                                                </div>
+                                                <div className="text-sm font-medium mt-1">
+                                                    {results.cookieInfo.cookies.keys && results.cookieInfo.cookies.keys.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {results.cookieInfo.cookies.keys.slice(0, 5).map((key, index) => (
+                                                                <span key={index} className="px-2 py-1 bg-background rounded text-xs">
+                                                                    {key}
+                                                                </span>
+                                                            ))}
+                                                            {results.cookieInfo.cookies.keys.length > 5 && (
+                                                                <span className="px-2 py-1 bg-background rounded text-xs">
+                                                                    +{results.cookieInfo.cookies.keys.length - 5} more
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        'No cookies detected'
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Button Information */}
+                                    {results.cookieInfo.element && (
+                                        <>
+                                            <div>
+                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                                    Button Element
+                                                </div>
+                                                <div className="text-sm font-medium mt-1">
+                                                    {results.cookieInfo.element.tagName?.toLowerCase() || 'button'}
+                                                </div>
+                                                {results.cookieInfo.element?.className && (
+                                                    <div className="text-xs text-muted-foreground mt-1 font-mono">
+                                                        .{results.cookieInfo.element.className.split(' ')[0]}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div>
+                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                                    Button Text
+                                                </div>
+                                                <div className="text-sm font-medium mt-1 truncate">
+                                                    "{results.cookieInfo.element.text}"
+                                                </div>
+                                                {results.cookieInfo.element?.id && (
+                                                    <div className="text-xs text-muted-foreground mt-1 font-mono">
+                                                        #{results.cookieInfo.element.id}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
-                                {results.cookieInfo.element && (
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                        Button found: "{results.cookieInfo.element.text}"
+
+                                {/* Action Details */}
+                                {results.cookieInfo.message && (
+                                    <div className="pt-3 border-t border-border">
+                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                            Action Details
+                                        </div>
+                                        <div className="text-sm mt-2 text-muted-foreground">
+                                            {results.cookieInfo.message}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* CMP Additional Info */}
+                                {results.cookieInfo.cmp?.platform && (
+                                    <div className="pt-2 border-t border-border">
+                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                            Platform Integration
+                                        </div>
+                                        <div className="text-sm mt-1">
+                                            {results.cookieInfo.cmp.platform}
+                                        </div>
                                     </div>
                                 )}
                             </div>
