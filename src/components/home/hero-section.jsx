@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { TypeAnimation } from "react-type-animation";
 
 export function HeroSection() {
 	return (
@@ -21,10 +22,18 @@ export function HeroSection() {
 							</h1>
 						</div>
 
-						{/* Subtitle */}
-						<p className="text-xl md:text-2xl font-light text-foreground/60 max-w-2xl leading-relaxed">
-							Analyze and visualize tracking data with precision and clarity
-						</p>
+					{/* Subtitle */}
+					<div className="text-xl md:text-2xl font-light text-foreground/60 max-w-2xl leading-relaxed">
+						<TypeAnimation
+							sequence={[
+								"Analyze and visualize tracking data with precision and clarity"
+							]}
+							speed={75}
+							cursor={true}
+							repeat={0}
+							className="inline-block"
+						/>
+					</div>
 					</div>
 
 					{/* Right Side - Texture Image (40% width, 80% height) */}

@@ -1,3 +1,5 @@
+"use client"
+
 import { UrlScanner } from "@/components/url-scanner";
 import { HeroSection } from "@/components/home/hero-section";
 import { FeaturesSection } from "@/components/home/features-section";
