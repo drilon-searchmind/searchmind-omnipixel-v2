@@ -18,7 +18,15 @@ export function HeroSection() {
 								className="object-contain"
 							/>
 							<h1 className="text-6xl md:text-7xl font-light tracking-tight text-foreground">
-								Omnipixel
+								<TypeAnimation 
+									sequence={[
+										"Omnipixel"
+									]}
+									speed={50}
+									cursor={false}
+									repeat={0}
+									className="inline-block"
+								/>
 							</h1>
 						</div>
 
@@ -28,7 +36,7 @@ export function HeroSection() {
 							sequence={[
 								"Analyze and visualize tracking data with precision and clarity"
 							]}
-							speed={75}
+							speed={90}
 							cursor={true}
 							repeat={0}
 							className="inline-block"

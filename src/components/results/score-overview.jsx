@@ -2,7 +2,7 @@ import { FaTachometerAlt, FaShieldAlt, FaServer, FaCheck, FaTimes } from "react-
 
 export function ScoreOverview({ results, totalScore }) {
     return (
-        <div id="overview" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div id="overview" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pb-10">
             {/* Overall Score */}
             <div className="border border-border/40 rounded p-6 bg-foreground text-background">
                 <div className="space-y-4">
