@@ -1,7 +1,7 @@
-import { FaTachometerAlt } from "react-icons/fa";
+import { FaTachometerAlt, FaCheckCircle, FaExclamationTriangle, FaTimesCircle } from "react-icons/fa";
 
 export function PerformanceMetrics({ results }) {
-    const getScoreColor = (metric, value) => {
+    const getScoreStatus = (metric, value) => {
         // Core Web Vitals scoring thresholds
         const thresholds = {
             firstContentfulPaint: { good: 1800, needsImprovement: 3000 },
@@ -14,11 +14,15 @@ export function PerformanceMetrics({ results }) {
         };
 
         const threshold = thresholds[metric];
-        if (!threshold) return 'text-foreground/50';
+        if (!threshold) return { status: 'unknown', color: 'text-black/30', icon: null };
 
-        if (value <= threshold.good) return 'text-foreground';
-        if (value <= threshold.needsImprovement) return 'text-foreground/70';
-        return 'text-foreground/50';
+        if (value <= threshold.good) {
+            return { status: 'good', color: 'text-emerald-800', icon: FaCheckCircle };
+        }
+        if (value <= threshold.needsImprovement) {
+            return { status: 'needs-improvement', color: 'text-amber-600', icon: FaExclamationTriangle };
+        }
+        return { status: 'poor', color: 'text-amber-600', icon: FaTimesCircle };
     };
 
     const formatMetric = (value, unit = 'ms') => {
@@ -27,19 +31,24 @@ export function PerformanceMetrics({ results }) {
         return value;
     };
 
-    const metrics = [
-        { key: 'firstContentfulPaint', label: 'First Contentful Paint', value: results.performance.firstContentfulPaint, unit: 'ms' },
-        { key: 'largestContentfulPaint', label: 'Largest Contentful Paint', value: results.performance.largestContentfulPaint, unit: 'ms' },
-        { key: 'firstInputDelay', label: 'First Input Delay', value: results.performance.firstInputDelay, unit: 'ms' },
-        { key: 'cumulativeLayoutShift', label: 'Cumulative Layout Shift', value: results.performance.cumulativeLayoutShift, unit: '', formatter: (v) => v.toFixed(3) },
-        { key: 'totalBlockingTime', label: 'Total Blocking Time', value: results.performance.totalBlockingTime, unit: 'ms' },
-        { key: 'speedIndex', label: 'Speed Index', value: results.performance.speedIndex, unit: 'ms' },
-        { key: 'timeToInteractive', label: 'Time to Interactive', value: results.performance.timeToInteractive, unit: 'ms' },
-        { key: 'loadTime', label: 'Page Load Time', value: results.performance.loadTime, unit: 's' }
+    const performance = results.performance || {};
+    
+    const coreWebVitals = [
+        { key: 'firstContentfulPaint', label: 'First Contentful Paint', shortLabel: 'FCP', value: performance.firstContentfulPaint, unit: 'ms' },
+        { key: 'largestContentfulPaint', label: 'Largest Contentful Paint', shortLabel: 'LCP', value: performance.largestContentfulPaint, unit: 'ms' },
+        { key: 'firstInputDelay', label: 'First Input Delay', shortLabel: 'FID', value: performance.firstInputDelay, unit: 'ms' },
+        { key: 'cumulativeLayoutShift', label: 'Cumulative Layout Shift', shortLabel: 'CLS', value: performance.cumulativeLayoutShift, unit: '', formatter: (v) => v.toFixed(3) },
+    ];
+
+    const performanceMetrics = [
+        { key: 'totalBlockingTime', label: 'Total Blocking Time', shortLabel: 'TBT', value: performance.totalBlockingTime, unit: 'ms' },
+        { key: 'speedIndex', label: 'Speed Index', shortLabel: 'SI', value: performance.speedIndex, unit: 'ms' },
+        { key: 'timeToInteractive', label: 'Time to Interactive', shortLabel: 'TTI', value: performance.timeToInteractive, unit: 'ms' },
+        { key: 'loadTime', label: 'Page Load Time', shortLabel: 'Load', value: performance.loadTime, unit: 's' },
     ];
 
     return (
-        <div id="performance" className="space-y-8 bg-foreground/10 py-20 px-6 rounded">
+        <div id="performance" className="space-y-8">
             <div className="space-y-2">
                 <div className="flex items-center gap-2">
                     <FaTachometerAlt className="w-5 h-5 text-foreground/50" />
@@ -49,29 +58,120 @@ export function PerformanceMetrics({ results }) {
                     Google Core Web Vitals metrics and performance indicators
                 </p>
             </div>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {metrics.map((metric) => (
-                    <div key={metric.key} className="space-y-2">
-                        <div className="flex justify-between items-start">
-                            <span className="text-sm font-light text-foreground/70 leading-tight">
-                                {metric.label}
-                            </span>
-                            <span className={`text-lg font-light ${getScoreColor(metric.key, metric.value)}`}>
-                                {metric.formatter ? metric.formatter(metric.value) : formatMetric(metric.value, metric.unit)}
-                            </span>
-                        </div>
-                        <div className="text-xs text-foreground/50">
-                            {metric.key === 'firstContentfulPaint' && 'Time to first content render'}
-                            {metric.key === 'largestContentfulPaint' && 'Time to largest content render'}
-                            {metric.key === 'firstInputDelay' && 'Response time to user input'}
-                            {metric.key === 'cumulativeLayoutShift' && 'Visual stability score'}
-                            {metric.key === 'totalBlockingTime' && 'Time page is blocked from responding'}
-                            {metric.key === 'speedIndex' && 'Time for page to become visually complete'}
-                            {metric.key === 'timeToInteractive' && 'Time for page to become fully interactive'}
-                            {metric.key === 'loadTime' && 'Total time to load the page'}
+
+            {/* Dashboard Container - Black Background */}
+            <div className="bg-foreground text-background rounded-lg py-10 px-6 space-y-8 mb-20">
+                {/* Overall Performance Score */}
+                {performance.performanceScore !== undefined && (
+                    <div className="border-b border-white/20 pb-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-light text-white/70 uppercase tracking-wider mb-4">Performance Score</h3>
+                                {/* Circular Progress Chart */}
+                                <div className="relative w-32 h-32 mx-auto mb-4">
+                                    {/* Background circle */}
+                                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                                        <circle
+                                            cx="60"
+                                            cy="60"
+                                            r="50"
+                                            stroke="rgba(255,255,255,0.1)"
+                                            strokeWidth="8"
+                                            fill="none"
+                                        />
+                                        {/* Progress circle */}
+                                        <circle
+                                            cx="60"
+                                            cy="60"
+                                            r="50"
+                                            stroke="white"
+                                            strokeWidth="8"
+                                            fill="none"
+                                            strokeDasharray={`${2 * Math.PI * 50}`}
+                                            strokeDashoffset={`${2 * Math.PI * 50 * (1 - performance.performanceScore / 100)}`}
+                                            strokeLinecap="round"
+                                            className="transition-all duration-1000 ease-out"
+                                        />
+                                    </svg>
+                                    {/* Score text in center */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="text-center">
+                                            <div className="text-3xl font-light text-white">{performance.performanceScore}</div>
+                                            <div className="text-xs font-light text-white/60 uppercase tracking-wide">Score</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-right space-y-1">
+                                <div className="text-xs text-white/50 uppercase tracking-wide">Accessibility</div>
+                                <div className="text-lg font-light text-white">{performance.accessibilityScore || 'N/A'}</div>
+                                <div className="text-xs text-white/50 uppercase tracking-wide">SEO</div>
+                                <div className="text-lg font-light text-white">{performance.seoScore || 'N/A'}</div>
+                            </div>
                         </div>
                     </div>
-                ))}
+                )}
+
+                {/* Core Web Vitals Grid */}
+                <div>
+                    <h3 className="text-sm font-light text-white/70 uppercase tracking-wider mb-4">Core Web Vitals</h3>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {coreWebVitals.map((metric) => {
+                            const scoreStatus = getScoreStatus(metric.key, metric.value);
+                            const Icon = scoreStatus.icon;
+                            return (
+                                <div key={metric.key} className="bg-white/95 border rounded p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-light text-black uppercase tracking-wide">
+                                            {metric.shortLabel}
+                                        </span>
+                                        {Icon && <Icon className={`w-4 h-4 ${scoreStatus.color}`} />}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className={`text-2xl font-light ${scoreStatus.color}`}>
+                                            {metric.formatter ? metric.formatter(metric.value) : formatMetric(metric.value, metric.unit)}
+                                        </div>
+                                        <div className="text-xs text-foreground/50 font-light">
+                                            {metric.label}
+                                        </div>
+                                    </div>
+                                    <div className="pt-2 border-t border-white/10">
+                                        <div className="text-xs text-foreground/40 capitalize">{scoreStatus.status.replace('-', ' ')}</div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Additional Performance Metrics */}
+                <div>
+                    <h3 className="text-sm font-light text-foreground/70 uppercase tracking-wider mb-4">Additional Metrics</h3>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {performanceMetrics.map((metric) => {
+                            const scoreStatus = getScoreStatus(metric.key, metric.value);
+                            const Icon = scoreStatus.icon;
+                            return (
+                                <div key={metric.key} className="bg-white/95 border rounded p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-light text-foreground/60 uppercase tracking-wide">
+                                            {metric.shortLabel}
+                                        </span>
+                                        {Icon && <Icon className={`w-4 h-4 ${scoreStatus.color}`} />}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className={`text-2xl font-light ${scoreStatus.color}`}>
+                                            {metric.formatter ? metric.formatter(metric.value) : formatMetric(metric.value, metric.unit)}
+                                        </div>
+                                        <div className="text-xs text-foreground/50 font-light">
+                                            {metric.label}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     );

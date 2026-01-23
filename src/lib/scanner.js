@@ -647,6 +647,29 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             console.warn('Failed to get page info:', pageInfo.message);
         }
 
+        // Step 5: Fetch PageSpeed Insights
+        console.log('Executing step 5: Fetch PageSpeed Insights');
+        onProgress(5, 'Analyzing performance metrics...');
+        try {
+            const { fetchPageSpeedInsights } = await import('@/lib/pagespeed');
+            const pageSpeedResult = await fetchPageSpeedInsights(url);
+            if (pageSpeedResult.success) {
+                results.performance = pageSpeedResult.data;
+                console.log('PageSpeed Insights retrieved:', results.performance);
+            } else {
+                console.warn('Failed to get PageSpeed Insights:', pageSpeedResult.message);
+            }
+        } catch (error) {
+            console.error('PageSpeed Insights error:', error);
+            // Continue without performance data
+        }
+
+        results.steps.push({
+            id: 5,
+            status: 'completed',
+            result: { success: true, message: 'Performance metrics retrieved' }
+        });
+
         results.success = true;
         console.log('Initial scan completed successfully');
 

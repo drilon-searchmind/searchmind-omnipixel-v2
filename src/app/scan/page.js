@@ -9,7 +9,8 @@ const SCAN_STEPS = [
     { id: 2, title: "Navigating to URL", description: "Connecting to the target website" },
     { id: 3, title: "Waiting for Page Load", description: "Allowing page to load completely" },
     { id: 4, title: "Accepting Cookies", description: "Automatically accepting cookie consent" },
-    { id: 5, title: "Analyzing Tracking Data", description: "Scanning for tracking pixels and scripts" },
+    { id: 5, title: "Analyzing Performance", description: "Fetching Core Web Vitals and metrics" },
+    { id: 6, title: "Analyzing Tracking Data", description: "Scanning for tracking pixels and scripts" },
 ];
 
 function ScanContent() {
@@ -85,8 +86,10 @@ function ScanContent() {
             setCurrentStep(4);
             await delay(500);
             setCurrentStep(5);
+            await delay(2000); // Performance analysis takes time
+            setCurrentStep(6);
 
-            // Step 6: Analyze tracking data (simulate)
+            // Step 7: Analyze tracking data (simulate)
             await delay(2000);
 
             // Complete - redirect to results with scan data

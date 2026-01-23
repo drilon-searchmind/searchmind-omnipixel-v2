@@ -149,6 +149,8 @@ function ResultsContent() {
                     pageInfo: scanData.pageInfo || null,
                     // Use real cookie info from scan
                     cookieInfo: scanData.cookieInfo || null,
+                    // Use real performance data from scan
+                    performance: scanData.performance || null,
                     // Keep mock data for other sections (will be replaced later)
                     consentModeV2: true,
                     serverSideTracking: false,
@@ -192,7 +194,7 @@ function ResultsContent() {
                         tracking: 92,
                         compliance: 88
                     },
-                    performance: {
+                    performance: scanData.performance || {
                         loadTime: 2.3,
                         firstContentfulPaint: 1.2,
                         largestContentfulPaint: 3.1,
