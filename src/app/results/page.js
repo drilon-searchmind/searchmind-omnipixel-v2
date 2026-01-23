@@ -18,6 +18,64 @@ import {
     FaTachometerAlt
 } from "react-icons/fa";
 
+// Table of Contents Sidebar Component
+function TableOfContents({ activeSection, onSectionClick, isMobile = false, onClose }) {
+    const sections = [
+        { id: 'overview', title: 'Overview & Scores', icon: FaTachometerAlt },
+        { id: 'detailed-scores', title: 'Detailed Scores', icon: FaChartLine },
+        { id: 'marketing-scripts', title: 'Marketing Scripts', icon: FaTag },
+        { id: 'performance', title: 'Performance Metrics', icon: FaTachometerAlt },
+        { id: 'gtm-analysis', title: 'GTM Analysis', icon: FaGoogle },
+        { id: 'privacy-cookies', title: 'Privacy & Cookies', icon: FaShieldAlt }
+    ];
+
+    const handleSectionClick = (sectionId) => {
+        onSectionClick(sectionId);
+        if (isMobile && onClose) onClose();
+    };
+
+    return (
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background/80 backdrop-blur-sm' : 'sticky top-20 h-fit max-h-[calc(100vh-6rem)] overflow-y-auto'}`}>
+            <div className={`bg-card border rounded-lg p-4 shadow-sm ${isMobile ? 'fixed top-20 left-4 right-4 max-w-sm mx-auto' : ''}`}>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                        Table of Contents
+                    </h3>
+                    {isMobile && (
+                        <button
+                            onClick={onClose}
+                            className="p-1 rounded-md hover:bg-accent"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
+                <nav className="space-y-1">
+                    {sections.map((section) => {
+                        const Icon = section.icon;
+                        return (
+                            <button
+                                key={section.id}
+                                onClick={() => handleSectionClick(section.id)}
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-left text-sm rounded-md transition-colors ${
+                                    activeSection === section.id
+                                        ? 'bg-accent text-accent-foreground font-medium'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                                }`}
+                            >
+                                <Icon className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate">{section.title}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+            </div>
+        </div>
+    );
+}
+
 function ResultsContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -25,6 +83,47 @@ function ResultsContent() {
     const scanDataParam = searchParams.get("scanData");
 
     const [results, setResults] = useState(null);
+    const [activeSection, setActiveSection] = useState('overview');
+    const [showMobileTOC, setShowMobileTOC] = useState(false);
+
+    // Intersection Observer for active section tracking
+    useEffect(() => {
+        const observerOptions = {
+            root: null,
+            rootMargin: '-80px 0px -50% 0px',
+            threshold: 0
+        };
+
+        const observerCallback = (entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    setActiveSection(entry.target.id);
+                }
+            });
+        };
+
+        const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+        // Observe all sections
+        const sections = ['overview', 'detailed-scores', 'marketing-scripts', 'performance', 'gtm-analysis', 'privacy-cookies'];
+        sections.forEach((sectionId) => {
+            const element = document.getElementById(sectionId);
+            if (element) observer.observe(element);
+        });
+
+        return () => observer.disconnect();
+    }, [results]); // Re-run when results are loaded
+
+    const scrollToSection = (sectionId) => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+            const offsetTop = element.offsetTop - 100; // Account for sticky header
+            window.scrollTo({
+                top: offsetTop,
+                behavior: 'smooth'
+            });
+        }
+    };
 
     useEffect(() => {
         if (!url) {
@@ -225,7 +324,15 @@ function ResultsContent() {
 
     return (
         <div className="min-h-screen p-4 md:p-8">
-            <div className="mx-auto max-w-7xl space-y-8">
+            <div className="mx-auto max-w-7xl">
+                <div className="flex gap-8">
+                    {/* Table of Contents Sidebar */}
+                    <div className="hidden lg:block w-60 flex-shrink-0">
+                        <TableOfContents activeSection={activeSection} onSectionClick={scrollToSection} />
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 min-w-0 space-y-8">
                 {/* Header */}
                 <div className="text-center space-y-4">
                     <h1 className="text-5xl font-bold tracking-tight text-foreground">
@@ -236,6 +343,15 @@ function ResultsContent() {
                         <span className="font-mono font-semibold text-foreground">{results.url}</span>
                     </p>
                     <div className="flex justify-center gap-4 mt-6">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="lg:hidden"
+                            onClick={() => setShowMobileTOC(true)}
+                        >
+                            <FaChartLine className="w-4 h-4 mr-2" />
+                            Table of Contents
+                        </Button>
                         <Button onClick={() => router.push("/")}>
                             New Scan
                         </Button>
@@ -288,7 +404,7 @@ function ResultsContent() {
                 )}
 
                 {/* Overall Score & Status */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-20 mb-20">
+                <div id="overview" className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-20 mb-20">
                     <Card className="bg-[var(--color-primary-searchmind)] text-white col-span-1 py-5">
                         <CardHeader className="pb-5">
                             <CardTitle className="text-xl">Overall Score</CardTitle>
@@ -354,7 +470,7 @@ function ResultsContent() {
                 </div>
 
                 {/* Detailed Scores */}
-                <Card className="mt-10 mb-10">
+                <Card id="detailed-scores" className="mt-10 mb-10">
                     <CardHeader>
                         <CardTitle>Detailed Scores</CardTitle>
                         <CardDescription>
@@ -384,7 +500,7 @@ function ResultsContent() {
                 </Card>
 
                 {/* Marketing Scripts Checklist */}
-                <Card className="mt-10 mb-10 bg-slate-50">
+                <Card id="marketing-scripts" className="mt-10 mb-10 bg-slate-50">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <FaTag className="w-6 h-6" />
@@ -441,7 +557,7 @@ function ResultsContent() {
                 </Card>
 
                 {/* Performance Metrics */}
-                <Card className="mt-10 mb-10">
+                <Card id="performance" className="mt-10 mb-10">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <FaTachometerAlt className="w-6 h-6" />
@@ -537,7 +653,7 @@ function ResultsContent() {
                 </Card>
 
                 {/* GTM Analysis Section (Placeholder) */}
-                <Card className="opacity-60 mt-20 mb-20">
+                <Card id="gtm-analysis" className="opacity-60 mt-20 mb-20">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <FaTag className="w-6 h-6" />
@@ -562,7 +678,7 @@ function ResultsContent() {
                 </Card>
 
                 {/* Cookie Status */}
-                <Card className="mt-10 mb-10">
+                <Card id="privacy-cookies" className="mt-10 mb-10">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <FaShieldAlt className="w-6 h-6" />
@@ -778,6 +894,18 @@ function ResultsContent() {
                         </div>
                     </CardContent>
                 </Card>
+                    </div>
+                </div>
+
+                {/* Mobile Table of Contents */}
+                {showMobileTOC && (
+                    <TableOfContents
+                        activeSection={activeSection}
+                        onSectionClick={scrollToSection}
+                        isMobile={true}
+                        onClose={() => setShowMobileTOC(false)}
+                    />
+                )}
             </div>
         </div>
     );
