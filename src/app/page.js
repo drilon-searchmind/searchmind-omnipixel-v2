@@ -1,33 +1,32 @@
 import { UrlScanner } from "@/components/url-scanner";
-import Image from "next/image";
+import { HeroSection } from "@/components/home/hero-section";
+import { FeaturesSection } from "@/components/home/features-section";
 
 export default function Home() {
 	return (
-		<div className="flex min-h-auto items-center justify-center mt-20">
-			<main className="w-full max-w-[1600px] space-y-8">
-				<div className="space-y-0 text-center">
-					<span className="flex items-center justify-center gap-0">
-						<Image
-							src="/images/tagstackLogo2NoBG.png"
-							alt="Tagstack Logo"
-							width={100}
-							height={100}
-							className="object-contain"
-						/>
-						<h1 className="text-7xl font-bold tracking-tight text-primary">
-							<span>Omnipixel</span>
-						</h1>
-					</span>
-					<h5 className="text-xl text-muted-foreground mt-10">
-						Omnipixel is a tool that allows you to analyze and visualize tracking data.
-					</h5>
-				</div>
-				<div className="flex justify-center">
-					<div className="w-full max-w-2xl">
+		<main className="min-h-screen bg-background">
+			{/* Hero Section */}
+			<HeroSection />
+
+			{/* Scanner Section */}
+			<section className="w-full py-16 border-t border-border/40">
+				<div className="container max-w-[1200px] mx-auto px-6">
+					<div className="space-y-6">
+						<div className="text-center space-y-2">
+							<h2 className="text-2xl font-light text-foreground">
+								Start Analyzing
+							</h2>
+							<p className="text-sm text-foreground/50">
+								Enter a URL to begin comprehensive website analysis
+							</p>
+						</div>
 						<UrlScanner />
 					</div>
 				</div>
-			</main>
-		</div>
+			</section>
+
+			{/* Features Section */}
+			<FeaturesSection />
+		</main>
 	);
 }

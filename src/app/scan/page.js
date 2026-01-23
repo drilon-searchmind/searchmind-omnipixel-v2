@@ -3,7 +3,6 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const SCAN_STEPS = [
     { id: 1, title: "Initializing Scanner", description: "Setting up scanning environment" },
@@ -105,85 +104,106 @@ function ScanContent() {
     if (error) {
         return (
             <div className="flex min-h-screen items-center justify-center p-8">
-                <Card className="w-full max-w-md">
-                    <CardHeader>
-                        <CardTitle className="text-destructive">Scan Error</CardTitle>
-                        <CardDescription>
+                <div className="w-full max-w-md space-y-6">
+                    <div className="space-y-2 text-center">
+                        <h2 className="text-2xl font-light text-foreground">Scan Error</h2>
+                        <p className="text-sm text-foreground/60">
                             An error occurred while scanning the URL
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">{error}</p>
-                        <Button onClick={() => router.push("/")} className="w-full">
-                            Try Again
-                        </Button>
-                    </CardContent>
-                </Card>
+                        </p>
+                    </div>
+                    <div className="p-4 border border-border/40 rounded bg-background">
+                        <p className="text-sm text-foreground/70 font-mono">{error}</p>
+                    </div>
+                    <Button onClick={() => router.push("/")} className="w-full">
+                        Try Again
+                    </Button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center p-8">
-            <Card className="w-full max-w-2xl">
-                <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">Scanning URL</CardTitle>
-                    <CardDescription className="text-lg">
+        <div className="min-h-screen py-16 px-6">
+            <div className="container max-w-3xl mx-auto space-y-12">
+                {/* Header */}
+                <div className="space-y-3 text-center">
+                    <h1 className="text-3xl font-light text-foreground">Scanning URL</h1>
+                    <p className="text-sm text-foreground/50 font-mono">
                         {url}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                        {SCAN_STEPS.map((step, index) => (
-                            <div
-                                key={step.id}
-                                className={`flex items-center space-x-4 p-4 rounded-lg border transition-colors ${
-                                    index < currentStep
-                                        ? "bg-accent/10 border-accent"
-                                        : index === currentStep - 1
-                                        ? "bg-primary/10 border-primary"
-                                        : "bg-muted/50 border-muted"
-                                }`}
-                            >
+                    </p>
+                </div>
+
+                {/* Steps */}
+                <div className="space-y-3">
+                    {SCAN_STEPS.map((step, index) => (
+                        <div
+                            key={step.id}
+                            className={`flex items-start gap-4 p-5 border rounded transition-all ${
+                                index < currentStep
+                                    ? "border-foreground/20 bg-foreground/5"
+                                    : index === currentStep - 1
+                                    ? "border-foreground/40 bg-foreground/10"
+                                    : "border-border/40 bg-background"
+                            }`}
+                        >
+                            {/* Step Number/Icon */}
+                            <div className="flex-shrink-0 mt-0.5">
                                 <div
-                                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-normal transition-all ${
                                         index < currentStep
-                                            ? "bg-accent text-accent-foreground"
+                                            ? "bg-foreground text-background"
                                             : index === currentStep - 1
-                                            ? "bg-primary text-primary-foreground animate-pulse"
-                                            : "bg-muted text-muted-foreground"
+                                            ? "bg-foreground text-background animate-pulse"
+                                            : "bg-secondary text-foreground/40 border border-border/60"
                                     }`}
                                 >
                                     {index < currentStep ? (
-                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                         </svg>
                                     ) : (
                                         step.id
                                     )}
                                 </div>
-                                <div className="flex-1">
-                                    <h3 className={`font-medium ${index < currentStep ? "text-accent" : index === currentStep - 1 ? "text-primary" : "text-muted-foreground"}`}>
-                                        {step.title}
-                                    </h3>
-                                    <p className={`text-sm ${index < currentStep ? "text-accent" : index === currentStep - 1 ? "text-primary" : "text-muted-foreground"}`}>
-                                        {step.description}
-                                    </p>
-                                </div>
                             </div>
-                        ))}
-                    </div>
 
-                    {isScanning && (
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                            <p className="text-sm text-muted-foreground mt-2">
-                                Please wait while we scan the website...
-                            </p>
+                            {/* Step Content */}
+                            <div className="flex-1 space-y-1">
+                                <h3 className={`text-base font-normal ${
+                                    index < currentStep 
+                                        ? "text-foreground" 
+                                        : index === currentStep - 1 
+                                        ? "text-foreground" 
+                                        : "text-foreground/60"
+                                }`}>
+                                    {step.title}
+                                </h3>
+                                <p className={`text-sm ${
+                                    index < currentStep 
+                                        ? "text-foreground/50" 
+                                        : index === currentStep - 1 
+                                        ? "text-foreground/50" 
+                                        : "text-foreground/40"
+                                }`}>
+                                    {step.description}
+                                </p>
+                            </div>
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                    ))}
+                </div>
+
+                {/* Loading Indicator */}
+                {isScanning && (
+                    <div className="text-center space-y-3 pt-4">
+                        <div className="inline-block">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground/20 border-t-foreground"></div>
+                        </div>
+                        <p className="text-sm text-foreground/50">
+                            Please wait while we scan the website...
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -192,7 +212,7 @@ export default function ScanPage() {
     return (
         <Suspense fallback={
             <div className="flex min-h-screen items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground/20 border-t-foreground"></div>
             </div>
         }>
             <ScanContent />

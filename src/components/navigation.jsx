@@ -4,6 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 const navigationItems = [
   { name: "Home", href: "/" },
@@ -16,30 +17,30 @@ export function Navigation() {
 	const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
 	return (
-		<nav className="sticky top-0 z-50 w-full border-b backdrop-blur">
-			<div className="container max-w-[1600px] mx-auto">
-				<div className="flex h-16 items-center justify-between">
+		<nav className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-sm border-b border-border/40">
+			<div className="container max-w-[1600px] mx-auto px-6">
+				<div className="flex h-20 items-center justify-between">
 					{/* Logo */}
 					<div className="flex items-center">
-						<a href="/" className="flex items-center gap-1 text-xl font-semibold tracking-tight">
+						<a href="/" className="flex items-center gap-2 text-lg font-medium tracking-tight text-foreground hover:opacity-80 transition-opacity">
 							<Image
 								src="/images/tagstackLogo2NoBG.png"
 								alt="Tagstack Logo"
-								width={32}
-								height={32}
+								width={28}
+								height={28}
 								className="object-contain"
 							/>
-							<span>Omnipixel</span>
+							<span className="font-semibold">Omnipixel</span>
 						</a>
 					</div>
 
 					{/* Desktop Navigation */}
-					<div className="hidden md:flex md:items-center md:space-x-6">
+					<div className="hidden md:flex md:items-center md:gap-8">
 						{navigationItems.map((item) => (
 							<a
 								key={item.name}
 								href={item.href}
-								className="text-sm font-medium text-foreground transition-colors hover:text-foreground/80"
+								className="text-sm font-normal text-foreground/70 transition-colors hover:text-foreground"
 							>
 								{item.name}
 							</a>
@@ -85,20 +86,20 @@ export function Navigation() {
 					className={cn(
 						"md:hidden",
 						mobileMenuOpen
-							? "block border-t"
+							? "block border-t border-border/40"
 							: "hidden"
 					)}
 				>
-					<div className="space-y-1 px-2 pb-3 pt-2">
+					<div className="space-y-0 px-2 pb-4 pt-3">
 						{navigationItems.map((item) => (
-							<a
+							<Link
 								key={item.name}
 								href={item.href}
-								className="block rounded-md px-3 py-2 text-base font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+								className="block px-3 py-2.5 text-sm font-normal text-foreground/70 transition-colors hover:text-foreground hover:bg-secondary/50"
 								onClick={() => setMobileMenuOpen(false)}
 							>
 								{item.name}
-							</a>
+							</Link>
 						))}
 					</div>
 				</div>

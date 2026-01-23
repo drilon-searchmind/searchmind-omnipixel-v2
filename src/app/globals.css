@@ -29,34 +29,34 @@
 }
 
 @theme {
-	/* Searchmind Deep Sea Color Palette */
+	/* Minimalistic Black/White/Grey Palette */
 	--color-background: #ffffff;
 	--color-foreground: #0d1b2a;
-	--color-card: #e0e1dd;
+	--color-card: #ffffff;
 	--color-card-foreground: #0d1b2a;
-	--color-popover: #e0e1dd;
+	--color-popover: #ffffff;
 	--color-popover-foreground: #0d1b2a;
 
-	--color-primary: #1b263b;
-	--color-primary-foreground: #e0e1dd;
+	--color-primary: #0d1b2a;
+	--color-primary-foreground: #ffffff;
 
-	--color-secondary: #778da9;
+	--color-secondary: #f5f5f5;
 	--color-secondary-foreground: #0d1b2a;
 
-	--color-muted: #415a77;
-	--color-muted-foreground: #e0e1dd;
+	--color-muted: #9ca3af;
+	--color-muted-foreground: #0d1b2a;
 
-	--color-accent: #1b263b;
-	--color-accent-foreground: #e0e1dd;
+	--color-accent: #0d1b2a;
+	--color-accent-foreground: #ffffff;
 
-	--color-destructive: #213834;
+	--color-destructive: #ef4444;
 	--color-destructive-foreground: #ffffff;
 
-	--color-border: #778da9;
-	--color-input: #778da9;
-	--color-ring: #1b263b;
+	--color-border: #e5e7eb;
+	--color-input: #e5e7eb;
+	--color-ring: #0d1b2a;
 
-	--radius: 0.5rem;
+	--radius: 0.25rem;
 }
 
 body {

@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaTachometerAlt } from "react-icons/fa";
 
 export function PerformanceMetrics({ results }) {
@@ -15,11 +14,11 @@ export function PerformanceMetrics({ results }) {
         };
 
         const threshold = thresholds[metric];
-        if (!threshold) return 'text-muted-foreground';
+        if (!threshold) return 'text-foreground/50';
 
-        if (value <= threshold.good) return 'text-accent';
-        if (value <= threshold.needsImprovement) return 'text-secondary';
-        return 'text-destructive';
+        if (value <= threshold.good) return 'text-foreground';
+        if (value <= threshold.needsImprovement) return 'text-foreground/70';
+        return 'text-foreground/50';
     };
 
     const formatMetric = (value, unit = 'ms') => {
@@ -40,42 +39,40 @@ export function PerformanceMetrics({ results }) {
     ];
 
     return (
-        <Card id="performance" className="mt-10 mb-10">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <FaTachometerAlt className="w-6 h-6" />
-                    Core Web Vitals & Performance
-                </CardTitle>
-                <CardDescription>
-                    Google Core Web Vitals metrics and performance indicators
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                    {metrics.map((metric) => (
-                        <div key={metric.key} className="space-y-2">
-                            <div className="flex justify-between items-start">
-                                <span className="text-sm font-medium leading-tight">
-                                    {metric.label}
-                                </span>
-                                <span className={`text-lg font-bold ${getScoreColor(metric.key, metric.value)}`}>
-                                    {metric.formatter ? metric.formatter(metric.value) : formatMetric(metric.value, metric.unit)}
-                                </span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                {metric.key === 'firstContentfulPaint' && 'Time to first content render'}
-                                {metric.key === 'largestContentfulPaint' && 'Time to largest content render'}
-                                {metric.key === 'firstInputDelay' && 'Response time to user input'}
-                                {metric.key === 'cumulativeLayoutShift' && 'Visual stability score'}
-                                {metric.key === 'totalBlockingTime' && 'Time page is blocked from responding'}
-                                {metric.key === 'speedIndex' && 'Time for page to become visually complete'}
-                                {metric.key === 'timeToInteractive' && 'Time for page to become fully interactive'}
-                                {metric.key === 'loadTime' && 'Total time to load the page'}
-                            </div>
-                        </div>
-                    ))}
+        <div id="performance" className="space-y-8">
+            <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                    <FaTachometerAlt className="w-5 h-5 text-foreground/50" />
+                    <h2 className="text-2xl font-light text-foreground">Core Web Vitals & Performance</h2>
                 </div>
-            </CardContent>
-        </Card>
+                <p className="text-sm text-foreground/50">
+                    Google Core Web Vitals metrics and performance indicators
+                </p>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {metrics.map((metric) => (
+                    <div key={metric.key} className="space-y-2">
+                        <div className="flex justify-between items-start">
+                            <span className="text-sm font-light text-foreground/70 leading-tight">
+                                {metric.label}
+                            </span>
+                            <span className={`text-lg font-light ${getScoreColor(metric.key, metric.value)}`}>
+                                {metric.formatter ? metric.formatter(metric.value) : formatMetric(metric.value, metric.unit)}
+                            </span>
+                        </div>
+                        <div className="text-xs text-foreground/50">
+                            {metric.key === 'firstContentfulPaint' && 'Time to first content render'}
+                            {metric.key === 'largestContentfulPaint' && 'Time to largest content render'}
+                            {metric.key === 'firstInputDelay' && 'Response time to user input'}
+                            {metric.key === 'cumulativeLayoutShift' && 'Visual stability score'}
+                            {metric.key === 'totalBlockingTime' && 'Time page is blocked from responding'}
+                            {metric.key === 'speedIndex' && 'Time for page to become visually complete'}
+                            {metric.key === 'timeToInteractive' && 'Time for page to become fully interactive'}
+                            {metric.key === 'loadTime' && 'Total time to load the page'}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }

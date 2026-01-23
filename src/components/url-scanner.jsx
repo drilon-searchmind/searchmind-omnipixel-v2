@@ -32,18 +32,22 @@ export function UrlScanner({ className, onSubmit }) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className={cn("w-full", className)}>
-            <div className="flex flex-col gap-4 sm:flex-row">
+        <form onSubmit={handleSubmit} className={cn("w-full relative z-10", className)}>
+            <div className="flex flex-col gap-3 sm:flex-row">
                 <Input
                     type="url"
-                    placeholder="Enter URL to scan..."
+                    placeholder="https://example.com"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="flex-1"
+                    className="flex-1 h-12 text-base border-border/60 focus:border-foreground/40 bg-background"
                     disabled={isLoading}
                 />
-                <Button type="submit" disabled={isLoading || !url.trim()}>
-                    {isLoading ? "Scanning..." : "Scan URL"}
+                <Button 
+                    type="submit" 
+                    disabled={isLoading || !url.trim()}
+                    className="h-12 px-8 bg-foreground text-background hover:opacity-90 font-normal border"
+                >
+                    {isLoading ? "Scanning..." : "Scan"}
                 </Button>
             </div>
         </form>

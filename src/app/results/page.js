@@ -3,7 +3,6 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     FaGoogle,
     FaFacebook,
@@ -43,36 +42,36 @@ function TableOfContents({ activeSection, onSectionClick, isMobile = false, onCl
 
     return (
         <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background/80 backdrop-blur-sm' : 'sticky top-20 h-fit max-h-[calc(100vh-6rem)] overflow-y-auto'}`}>
-            <div className={`bg-card border rounded-lg p-4 shadow-sm ${isMobile ? 'fixed top-20 left-4 right-4 max-w-sm mx-auto' : ''}`}>
+            <div className={`bg-background border border-border/40 rounded p-4 ${isMobile ? 'fixed top-20 left-4 right-4 max-w-sm mx-auto' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                        Table of Contents
+                    <h3 className="font-normal text-xs uppercase tracking-wider text-foreground/50">
+                        Contents
                     </h3>
                     {isMobile && (
                         <button
                             onClick={onClose}
-                            className="p-1 rounded-md hover:bg-accent"
+                            className="p-1 rounded hover:bg-secondary transition-colors"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     )}
                 </div>
-                <nav className="space-y-1">
+                <nav className="space-y-0.5">
                     {sections.map((section) => {
                         const Icon = section.icon;
                         return (
                             <button
                                 key={section.id}
                                 onClick={() => handleSectionClick(section.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2 text-left text-sm rounded-md transition-colors ${
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-left text-sm rounded transition-colors ${
                                     activeSection === section.id
-                                        ? 'bg-accent text-accent-foreground font-medium'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                                        ? 'bg-foreground text-background font-normal'
+                                        : 'text-foreground/60 hover:text-foreground hover:bg-secondary/50 font-light'
                                 }`}
                             >
-                                <Icon className="w-4 h-4 flex-shrink-0" />
+                                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
                                 <span className="truncate">{section.title}</span>
                             </button>
                         );
@@ -300,7 +299,7 @@ function ResultsContent() {
     if (!results) {
         return (
             <div className="flex min-h-screen items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground/20 border-t-foreground"></div>
             </div>
         );
     }
@@ -312,85 +311,88 @@ function ResultsContent() {
 
 
     return (
-        <div className="min-h-screen p-4 md:p-8">
-            <div className="mx-auto max-w-7xl">
-                <div className="flex gap-8">
+        <div className="min-h-screen py-12 px-6">
+            <div className="container max-w-7xl mx-auto">
+                <div className="flex gap-12">
                     {/* Table of Contents Sidebar */}
-                    <div className="hidden lg:block w-60 flex-shrink-0">
+                    <div className="hidden lg:block w-56 flex-shrink-0">
                         <TableOfContents activeSection={activeSection} onSectionClick={scrollToSection} />
                     </div>
 
                     {/* Main Content */}
-                    <div className="flex-1 min-w-0 space-y-8">
-                {/* Header */}
-                <div className="text-center space-y-4">
-                    <h1 className="text-5xl font-bold tracking-tight text-foreground">
-                        Technical Analysis Report
-                    </h1>
-                    <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                        Comprehensive tracking and performance analysis for{" "}
-                        <span className="font-mono font-semibold text-foreground">{results.url}</span>
-                    </p>
-                    <div className="flex justify-center gap-4 mt-6">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="lg:hidden"
-                            onClick={() => setShowMobileTOC(true)}
-                        >
-                            <FaChartLine className="w-4 h-4 mr-2" />
-                            Table of Contents
-                        </Button>
-                        <Button onClick={() => router.push("/")}>
-                            New Scan
-                        </Button>
-                        <Button variant="outline" onClick={() => router.push("/scan?url=" + encodeURIComponent(results.url))}>
-                            Re-scan
-                        </Button>
-                        <Button variant="ghost" onClick={() => window.print()}>
-                            Export Report
-                        </Button>
-                    </div>
-                </div>
+                    <div className="flex-1 min-w-0 space-y-16">
+                        {/* Header */}
+                        <div className="space-y-6">
+                            <div className="space-y-3">
+                                <h1 className="text-4xl font-light tracking-tight text-foreground">
+                                    Technical Analysis Report
+                                </h1>
+                                <p className="text-sm text-foreground/50 font-mono">
+                                    {results.url}
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="lg:hidden"
+                                    onClick={() => setShowMobileTOC(true)}
+                                >
+                                    <FaChartLine className="w-4 h-4 mr-2" />
+                                    Contents
+                                </Button>
+                                <Button 
+                                    onClick={() => router.push("/")}
+                                    variant="outline"
+                                >
+                                    New Scan
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    onClick={() => router.push("/scan?url=" + encodeURIComponent(results.url))}
+                                >
+                                    Re-scan
+                                </Button>
+                                <Button 
+                                    variant="ghost" 
+                                    onClick={() => window.print()}
+                                >
+                                    Export
+                                </Button>
+                            </div>
+                        </div>
 
-                {/* Real Scan Data Display */}
-                {results.pageInfo && (
-                    <Card className="bg-primary/5 border-primary/20">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <FaTachometerAlt className="w-5 h-5 text-primary" />
-                                Live Scan Results
-                            </CardTitle>
-                            <CardDescription>
-                                Real data captured from the scanned website
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-primary">{results.pageInfo.scripts}</div>
-                                    <div className="text-sm text-muted-foreground">Scripts Found</div>
+                        {/* Real Scan Data Display */}
+                        {results.pageInfo && (
+                            <div className="border border-border/40 rounded p-6 space-y-6">
+                                <div className="space-y-1">
+                                    <h2 className="text-lg font-light text-foreground">Live Scan Results</h2>
+                                    <p className="text-xs text-foreground/50">Real data captured from the scanned website</p>
                                 </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-primary">{results.pageInfo.links}</div>
-                                    <div className="text-sm text-muted-foreground">Links Found</div>
+                                <div className="grid gap-6 md:grid-cols-3">
+                                    <div className="space-y-1">
+                                        <div className="text-3xl font-light text-foreground">{results.pageInfo.scripts}</div>
+                                        <div className="text-xs text-foreground/50">Scripts Found</div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-3xl font-light text-foreground">{results.pageInfo.links}</div>
+                                        <div className="text-xs text-foreground/50">Links Found</div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-3xl font-light text-foreground">{results.pageInfo.images}</div>
+                                        <div className="text-xs text-foreground/50">Images Found</div>
+                                    </div>
                                 </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-primary">{results.pageInfo.images}</div>
-                                    <div className="text-sm text-muted-foreground">Images Found</div>
-                                </div>
-                            </div>
-                            <div className="mt-4 p-3 bg-white rounded border">
-                                <div className="text-sm">
-                                    <strong>Page Title:</strong> {results.pageInfo.title || 'N/A'}
-                                </div>
-                                <div className="text-sm mt-1">
-                                    <strong>Cookies:</strong> {results.pageInfo.cookies || 0}
+                                <div className="pt-4 border-t border-border/40 space-y-2">
+                                    <div className="text-sm">
+                                        <span className="text-foreground/50">Page Title:</span> <span className="text-foreground">{results.pageInfo.title || 'N/A'}</span>
+                                    </div>
+                                    <div className="text-sm">
+                                        <span className="text-foreground/50">Cookies:</span> <span className="text-foreground">{results.pageInfo.cookies || 0}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
+                        )}
 
                 {/* Overall Score & Status */}
                 <ScoreOverview results={results} totalScore={totalScore} />
@@ -410,32 +412,28 @@ function ResultsContent() {
                 {/* Cookie Status */}
                 <PrivacyCookies results={results} />
 
-                {/* Scan Metadata */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Scan Metadata</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Target URL</div>
-                                <div className="font-mono text-sm break-all">{results.url}</div>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Scan Timestamp</div>
-                                <div className="text-sm">{new Date(results.scannedAt).toLocaleString()}</div>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Scanner Version</div>
-                                <div className="text-sm">Omnipixel v2.0.0</div>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Analysis Engine</div>
-                                <div className="text-sm">Browser Automation + AI Analysis</div>
+                        {/* Scan Metadata */}
+                        <div className="border border-border/40 rounded p-6 space-y-6">
+                            <h2 className="text-lg font-light text-foreground">Scan Metadata</h2>
+                            <div className="grid gap-6 md:grid-cols-2">
+                                <div className="space-y-1">
+                                    <div className="text-xs text-foreground/50 uppercase tracking-wide">Target URL</div>
+                                    <div className="font-mono text-sm text-foreground break-all">{results.url}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-xs text-foreground/50 uppercase tracking-wide">Scan Timestamp</div>
+                                    <div className="text-sm text-foreground">{new Date(results.scannedAt).toLocaleString()}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-xs text-foreground/50 uppercase tracking-wide">Scanner Version</div>
+                                    <div className="text-sm text-foreground">Omnipixel v2.0.0</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-xs text-foreground/50 uppercase tracking-wide">Analysis Engine</div>
+                                    <div className="text-sm text-foreground">Browser Automation + AI Analysis</div>
+                                </div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
                     </div>
                 </div>
 
@@ -457,7 +455,7 @@ export default function ResultsPage() {
     return (
         <Suspense fallback={
             <div className="flex min-h-screen items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground/20 border-t-foreground"></div>
             </div>
         }>
             <ResultsContent />
