@@ -107,7 +107,7 @@ function ScanContent() {
             <div className="flex min-h-screen items-center justify-center p-8">
                 <Card className="w-full max-w-md">
                     <CardHeader>
-                        <CardTitle className="text-red-600">Scan Error</CardTitle>
+                        <CardTitle className="text-destructive">Scan Error</CardTitle>
                         <CardDescription>
                             An error occurred while scanning the URL
                         </CardDescription>
@@ -139,19 +139,19 @@ function ScanContent() {
                                 key={step.id}
                                 className={`flex items-center space-x-4 p-4 rounded-lg border transition-colors ${
                                     index < currentStep
-                                        ? "bg-green-50 border-green-200"
+                                        ? "bg-accent/10 border-accent"
                                         : index === currentStep - 1
-                                        ? "bg-blue-50 border-blue-200"
-                                        : "bg-gray-50 border-gray-200"
+                                        ? "bg-primary/10 border-primary"
+                                        : "bg-muted/50 border-muted"
                                 }`}
                             >
                                 <div
                                     className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                                         index < currentStep
-                                            ? "bg-green-500 text-white"
+                                            ? "bg-accent text-accent-foreground"
                                             : index === currentStep - 1
-                                            ? "bg-blue-500 text-white animate-pulse"
-                                            : "bg-gray-300 text-gray-600"
+                                            ? "bg-primary text-primary-foreground animate-pulse"
+                                            : "bg-muted text-muted-foreground"
                                     }`}
                                 >
                                     {index < currentStep ? (
@@ -163,10 +163,10 @@ function ScanContent() {
                                     )}
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className={`font-medium ${index < currentStep ? "text-green-800" : index === currentStep - 1 ? "text-blue-800" : "text-gray-600"}`}>
+                                    <h3 className={`font-medium ${index < currentStep ? "text-accent" : index === currentStep - 1 ? "text-primary" : "text-muted-foreground"}`}>
                                         {step.title}
                                     </h3>
-                                    <p className={`text-sm ${index < currentStep ? "text-green-600" : index === currentStep - 1 ? "text-blue-600" : "text-gray-500"}`}>
+                                    <p className={`text-sm ${index < currentStep ? "text-accent" : index === currentStep - 1 ? "text-primary" : "text-muted-foreground"}`}>
                                         {step.description}
                                     </p>
                                 </div>

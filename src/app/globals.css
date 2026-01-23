@@ -19,37 +19,44 @@
 	--color-light-green: #6A8F4D;
 	--color-green: #213834;
 	--color-black: #131313;
+
+	/* Palette 1 (Deep Sea) */
+	--ink-black: #0d1b2a;
+	--prussian-blue: #1b263b;
+	--dusk-blue: #415a77;
+	--dusty-denim: #778da9;
+	--alabaster-grey: #e0e1dd;
 }
 
 @theme {
-  /* Searchmind Color Palette */
-  --color-background: var(--color-natural);
-  --color-foreground: var(--color-black);
-  --color-card: var(--color-natural);
-  --color-card-foreground: var(--color-black);
-  --color-popover: var(--color-natural);
-  --color-popover-foreground: var(--color-black);
+	/* Searchmind Deep Sea Color Palette */
+	--color-background: #ffffff;
+	--color-foreground: #0d1b2a;
+	--color-card: #e0e1dd;
+	--color-card-foreground: #0d1b2a;
+	--color-popover: #e0e1dd;
+	--color-popover-foreground: #0d1b2a;
 
-  --color-primary: var(--color-primary-searchmind);
-  --color-primary-foreground: var(--color-natural);
+	--color-primary: #1b263b;
+	--color-primary-foreground: #e0e1dd;
 
-  --color-secondary: var(--color-secondary-searchmind);
-  --color-secondary-foreground: var(--color-black);
+	--color-secondary: #778da9;
+	--color-secondary-foreground: #0d1b2a;
 
-  --color-muted: var(--color-light-natural);
-  --color-muted-foreground: var(--color-green);
+	--color-muted: #415a77;
+	--color-muted-foreground: #e0e1dd;
 
-  --color-accent: var(--color-lime);
-  --color-accent-foreground: var(--color-black);
+	--color-accent: #1b263b;
+	--color-accent-foreground: #e0e1dd;
 
-  --color-destructive: var(--color-dark-green);
-  --color-destructive-foreground: var(--color-natural);
+	--color-destructive: #213834;
+	--color-destructive-foreground: #ffffff;
 
-  --color-border: var(--color-dark-natural);
-  --color-input: var(--color-dark-natural);
-  --color-ring: var(--color-primary-searchmind);
+	--color-border: #778da9;
+	--color-input: #778da9;
+	--color-ring: #1b263b;
 
-  --radius: 0.5rem;
+	--radius: 0.5rem;
 }
 
 body {

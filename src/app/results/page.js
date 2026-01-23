@@ -12,11 +12,18 @@ import {
     FaTag,
     FaChartLine,
     FaCheck,
-    FaTimes,
     FaServer,
     FaShieldAlt,
     FaTachometerAlt
 } from "react-icons/fa";
+
+// Import result components
+import { ScoreOverview } from "@/components/results/score-overview";
+import { DetailedScores } from "@/components/results/detailed-scores";
+import { MarketingScripts } from "@/components/results/marketing-scripts";
+import { PerformanceMetrics } from "@/components/results/performance-metrics";
+import { GTMAnalysis } from "@/components/results/gtm-analysis";
+import { PrivacyCookies } from "@/components/results/privacy-cookies";
 
 // Table of Contents Sidebar Component
 function TableOfContents({ activeSection, onSectionClick, isMobile = false, onClose }) {
@@ -303,24 +310,6 @@ function ResultsContent() {
         (results.scores.privacy + results.scores.performance + results.scores.tracking + results.scores.compliance) / 4
     );
 
-    // Script icons mapping
-    const scriptIcons = {
-        gtm: <FaTag className="w-5 h-5 text-primary" />,
-        ga4: <FaGoogle className="w-5 h-5 text-primary" />,
-        meta: <FaFacebook className="w-5 h-5 text-primary" />,
-        tiktok: <FaTiktok className="w-5 h-5 text-foreground" />,
-        linkedin: <FaLinkedin className="w-5 h-5 text-primary" />,
-        googleAds: <FaChartLine className="w-5 h-5 text-primary" />
-    };
-
-    const scriptNames = {
-        gtm: "Google Tag Manager",
-        ga4: "Google Analytics 4",
-        meta: "Meta Pixel",
-        tiktok: "TikTok Pixel",
-        linkedin: "LinkedIn Insight",
-        googleAds: "Google Ads"
-    };
 
     return (
         <div className="min-h-screen p-4 md:p-8">
@@ -366,10 +355,10 @@ function ResultsContent() {
 
                 {/* Real Scan Data Display */}
                 {results.pageInfo && (
-                    <Card className="bg-blue-50 border-blue-200">
+                    <Card className="bg-primary/5 border-primary/20">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <FaTachometerAlt className="w-5 h-5 text-blue-600" />
+                                <FaTachometerAlt className="w-5 h-5 text-primary" />
                                 Live Scan Results
                             </CardTitle>
                             <CardDescription>
@@ -379,15 +368,15 @@ function ResultsContent() {
                         <CardContent>
                             <div className="grid gap-4 md:grid-cols-3">
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-blue-600">{results.pageInfo.scripts}</div>
+                                    <div className="text-2xl font-bold text-primary">{results.pageInfo.scripts}</div>
                                     <div className="text-sm text-muted-foreground">Scripts Found</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-blue-600">{results.pageInfo.links}</div>
+                                    <div className="text-2xl font-bold text-primary">{results.pageInfo.links}</div>
                                     <div className="text-sm text-muted-foreground">Links Found</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-blue-600">{results.pageInfo.images}</div>
+                                    <div className="text-2xl font-bold text-primary">{results.pageInfo.images}</div>
                                     <div className="text-sm text-muted-foreground">Images Found</div>
                                 </div>
                             </div>
@@ -404,469 +393,22 @@ function ResultsContent() {
                 )}
 
                 {/* Overall Score & Status */}
-                <div id="overview" className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-20 mb-20">
-                    <Card className="bg-[var(--color-primary-searchmind)] text-white col-span-1 py-5">
-                        <CardHeader className="pb-5">
-                            <CardTitle className="text-xl">Overall Score</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-5xl font-bold text-emerald-500">{totalScore}/100</div>
-                            <div className="text-xs mt-3">
-                                Combined technical score
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg flex items-center gap-2 ">
-                                <FaTachometerAlt className="w-5 h-5" />
-                                Performance Score
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-3xl font-bold text-emerald-500">{results.scores.performance}/100</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                                Core Web Vitals optimized
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <FaShieldAlt className="w-5 h-5" />
-                                Consent Mode V2
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                {results.consentModeV2 ? (
-                                    <><FaCheck className="w-5 h-5 text-emerald-500" /> <span className="font-semibold text-emerald-500">Enabled</span></>
-                                ) : (
-                                    <><FaTimes className="w-5 h-5 text-red-500" /> <span className="font-semibold text-red-500">Disabled</span></>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <FaServer className="w-5 h-5" />
-                                Server-side Tracking
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                {results.serverSideTracking ? (
-                                    <><FaCheck className="w-5 h-5 text-emerald-500" /> <span className="font-semibold text-emerald-500">Active</span></>
-                                ) : (
-                                    <><FaTimes className="w-5 h-5 text-red-500" /> <span className="font-semibold text-red-500">Not Detected</span></>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <ScoreOverview results={results} totalScore={totalScore} />
 
                 {/* Detailed Scores */}
-                <Card id="detailed-scores" className="mt-10 mb-10">
-                    <CardHeader>
-                        <CardTitle>Detailed Scores</CardTitle>
-                        <CardDescription>
-                            Breakdown of technical compliance and optimization scores
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            {Object.entries(results.scores).map(([category, score]) => (
-                                <div key={category} className="space-y-2">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm font-medium capitalize">{category}</span>
-                                        <span className="text-lg font-bold">{score}/100</span>
-                                    </div>
-                                    <div className="w-full bg-muted rounded-full h-2">
-                                        <div
-                                            className={`h-2 rounded-full ${score >= 90 ? 'bg-accent' :
-                                                    score >= 70 ? 'bg-primary' : 'bg-destructive'
-                                                }`}
-                                            style={{ width: `${score}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+                <DetailedScores results={results} />
 
                 {/* Marketing Scripts Checklist */}
-                <Card id="marketing-scripts" className="mt-10 mb-10 bg-slate-50">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FaTag className="w-6 h-6" />
-                            Marketing Scripts Analysis
-                        </CardTitle>
-                        <CardDescription>
-                            Detected marketing and analytics implementations with technical details
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {Object.entries(results.marketingScripts).map(([key, data]) => (
-                                <div key={key} className={`p-4 border rounded-lg transition-colors ${data.found
-                                        ? 'bg-accent/10 border-accent/20 hover:bg-accent/20'
-                                        : 'bg-muted border-border'
-                                    }`}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-3">
-                                            {scriptIcons[key]}
-                                            <div>
-                                                <div className="font-semibold">{scriptNames[key]}</div>
-                                                {data.found && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {data.containerId && `Container: ${data.containerId}`}
-                                                        {data.measurementId && `Measurement: ${data.measurementId}`}
-                                                        {data.pixelId && `Pixel: ${data.pixelId}`}
-                                                        {data.conversionId && `Conversion: ${data.conversionId}`}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {data.found ? (
-                                                <><FaCheck className="w-4 h-4 text-emerald-500" /> <span className="text-sm font-medium text-emerald-500">Detected</span></>
-                                            ) : (
-                                                <><FaTimes className="w-4 h-4 text-muted-foreground" /> <span className="text-sm font-medium text-muted-foreground">Not Found</span></>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {data.found && (
-                                        <div className="space-y-1 text-xs text-muted-foreground">
-                                            {data.version && <div>Version: {data.version}</div>}
-                                            {data.lastUpdated && <div>Last Updated: {data.lastUpdated}</div>}
-                                            {data.enhancedEcommerce && <div>✓ Enhanced E-commerce</div>}
-                                            {data.conversionsApi && <div>✓ Conversions API</div>}
-                                            {data.remarketing && <div>✓ Remarketing</div>}
-                                            {data.customAudiences && <div>✓ Custom Audiences</div>}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+                <MarketingScripts results={results} />
 
                 {/* Performance Metrics */}
-                <Card id="performance" className="mt-10 mb-10">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FaTachometerAlt className="w-6 h-6" />
-                            Core Web Vitals & Performance
-                        </CardTitle>
-                        <CardDescription>
-                            Google Core Web Vitals metrics and performance indicators
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Load Time</div>
-                                <div className="text-2xl font-bold">{results.performance.loadTime}s</div>
-                                <div className={`text-xs font-medium ${results.performance.loadTime < 3 ? 'text-emerald-500' :
-                                        results.performance.loadTime < 5 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.loadTime < 3 ? 'Good' : results.performance.loadTime < 5 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">First Contentful Paint</div>
-                                <div className="text-2xl font-bold">{results.performance.firstContentfulPaint}s</div>
-                                <div className={`text-xs font-medium ${results.performance.firstContentfulPaint < 1.8 ? 'text-emerald-500' :
-                                        results.performance.firstContentfulPaint < 3 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.firstContentfulPaint < 1.8 ? 'Good' : results.performance.firstContentfulPaint < 3 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Largest Contentful Paint</div>
-                                <div className="text-2xl font-bold">{results.performance.largestContentfulPaint}s</div>
-                                <div className={`text-xs font-medium ${results.performance.largestContentfulPaint < 2.5 ? 'text-emerald-500' :
-                                        results.performance.largestContentfulPaint < 4 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.largestContentfulPaint < 2.5 ? 'Good' : results.performance.largestContentfulPaint < 4 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Cumulative Layout Shift</div>
-                                <div className="text-2xl font-bold">{results.performance.cumulativeLayoutShift}</div>
-                                <div className={`text-xs font-medium ${results.performance.cumulativeLayoutShift < 0.1 ? 'text-emerald-500' :
-                                        results.performance.cumulativeLayoutShift < 0.25 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.cumulativeLayoutShift < 0.1 ? 'Good' : results.performance.cumulativeLayoutShift < 0.25 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">First Input Delay</div>
-                                <div className="text-2xl font-bold">{results.performance.firstInputDelay}ms</div>
-                                <div className={`text-xs font-medium ${results.performance.firstInputDelay < 100 ? 'text-emerald-500' :
-                                        results.performance.firstInputDelay < 300 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.firstInputDelay < 100 ? 'Good' : results.performance.firstInputDelay < 300 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Total Blocking Time</div>
-                                <div className="text-2xl font-bold">{results.performance.totalBlockingTime}ms</div>
-                                <div className={`text-xs font-medium ${results.performance.totalBlockingTime < 200 ? 'text-emerald-500' :
-                                        results.performance.totalBlockingTime < 600 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.totalBlockingTime < 200 ? 'Good' : results.performance.totalBlockingTime < 600 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Speed Index</div>
-                                <div className="text-2xl font-bold">{results.performance.speedIndex}s</div>
-                                <div className={`text-xs font-medium ${results.performance.speedIndex < 3.4 ? 'text-emerald-500' :
-                                        results.performance.speedIndex < 5.8 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.speedIndex < 3.4 ? 'Good' : results.performance.speedIndex < 5.8 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-muted-foreground">Time to Interactive</div>
-                                <div className="text-2xl font-bold">{results.performance.timeToInteractive}s</div>
-                                <div className={`text-xs font-medium ${results.performance.timeToInteractive < 3.8 ? 'text-emerald-500' :
-                                        results.performance.timeToInteractive < 7.3 ? 'text-primary' : 'text-destructive'
-                                    }`}>
-                                    {results.performance.timeToInteractive < 3.8 ? 'Good' : results.performance.timeToInteractive < 7.3 ? 'Needs improvement' : 'Poor'}
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                <PerformanceMetrics results={results} />
 
                 {/* GTM Analysis Section (Placeholder) */}
-                <Card id="gtm-analysis" className="opacity-60 mt-20 mb-20">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FaTag className="w-6 h-6" />
-                            Google Tag Manager Analysis
-                        </CardTitle>
-                        <CardDescription>
-                            Detailed GTM container analysis and optimization recommendations
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-center py-12">
-                            <FaTag className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                            <div className="text-lg font-medium text-muted-foreground mb-2">
-                                GTM Analysis Coming Soon
-                            </div>
-                            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                                Advanced GTM container analysis, trigger optimization, and tag management
-                                recommendations will be available in a future update.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
+                <GTMAnalysis results={results} />
 
                 {/* Cookie Status */}
-                <Card id="privacy-cookies" className="mt-10 mb-10">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FaShieldAlt className="w-6 h-6" />
-                            Privacy & Cookies
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {/* Cookie Acceptance Status */}
-                        <div className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${
-                                    results.cookieInfo?.accepted ? 'bg-accent' :
-                                    results.cookieInfo?.accepted === false ? 'bg-destructive' : 'bg-muted'
-                                }`}></div>
-                                <div>
-                                    <div className="font-medium">Cookie Acceptance</div>
-                                    <div className="text-sm text-muted-foreground">
-                                        {results.cookieInfo?.accepted ?
-                                            `Cookies automatically accepted using ${results.cookieInfo.method || 'text-based detection'}` :
-                                            results.cookieInfo?.message || 'Unable to accept cookies automatically'
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className={`text-sm font-medium ${
-                                    results.cookieInfo?.accepted ? 'text-accent' :
-                                    results.cookieInfo?.accepted === false ? 'text-destructive' : 'text-muted-foreground'
-                                }`}>
-                                    {results.cookieInfo?.accepted ? 'Accepted' :
-                                     results.cookieInfo?.accepted === false ? 'Failed' : 'Unknown'}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Enhanced Cookie Details */}
-                        {results.cookieInfo && (
-                            <div className="p-4 bg-muted rounded-lg space-y-4">
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {/* CMP Detection */}
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            CMP Provider
-                                        </div>
-                                        <div className="text-sm font-medium mt-1">
-                                            {results.cookieInfo.cmp ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span>{results.cookieInfo.cmp.name}</span>
-                                                    <span className={`px-2 py-1 text-xs rounded-full ${
-                                                        results.cookieInfo.cmp.confidence === 'high'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : results.cookieInfo.cmp.confidence === 'medium'
-                                                            ? 'bg-yellow-100 text-yellow-800'
-                                                            : 'bg-gray-100 text-gray-800'
-                                                    }`}>
-                                                        {results.cookieInfo.cmp.confidence || 'unknown'}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                results.cookieInfo.provider === 'Text-based detection' ? 'Auto-detected' : results.cookieInfo.provider || 'Unknown'
-                                            )}
-                                        </div>
-                                        {results.cookieInfo.cmp?.version && (
-                                            <div className="text-xs text-muted-foreground">
-                                                Version: {results.cookieInfo.cmp.version}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Detection Method */}
-                                    <div>
-                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Detection Method
-                                        </div>
-                                        <div className="text-sm font-medium mt-1">
-                                            {results.cookieInfo.method === 'cmp-specific' ? 'CMP-Specific' : 'Text-Based'}
-                                        </div>
-                                        {results.cookieInfo.cmp && (
-                                            <div className="text-xs text-muted-foreground mt-1">
-                                                {results.cookieInfo.cmp.elements || 0} elements, {results.cookieInfo.cmp.scripts || 0} scripts detected
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Cookie Statistics */}
-                                    {results.cookieInfo.cookies && (
-                                        <>
-                                            <div>
-                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                                    Cookies Found
-                                                </div>
-                                                <div className="text-sm font-medium mt-1">
-                                                    {results.cookieInfo.cookies.count} total cookies
-                                                </div>
-                                                {results.cookieInfo.cookies.domains && results.cookieInfo.cookies.domains > 0 && (
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        {results.cookieInfo.cookies.domains} domains
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div>
-                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                                    Cookie Categories
-                                                </div>
-                                                <div className="text-sm font-medium mt-1">
-                                                    {results.cookieInfo.cookies.keys && results.cookieInfo.cookies.keys.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {results.cookieInfo.cookies.keys.slice(0, 5).map((key, index) => (
-                                                                <span key={index} className="px-2 py-1 bg-background rounded text-xs">
-                                                                    {key}
-                                                                </span>
-                                                            ))}
-                                                            {results.cookieInfo.cookies.keys.length > 5 && (
-                                                                <span className="px-2 py-1 bg-background rounded text-xs">
-                                                                    +{results.cookieInfo.cookies.keys.length - 5} more
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        'No cookies detected'
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    {/* Button Information */}
-                                    {results.cookieInfo.element && (
-                                        <>
-                                            <div>
-                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                                    Button Element
-                                                </div>
-                                                <div className="text-sm font-medium mt-1">
-                                                    {results.cookieInfo.element.tagName?.toLowerCase() || 'button'}
-                                                </div>
-                                                {results.cookieInfo.element?.className && (
-                                                    <div className="text-xs text-muted-foreground mt-1 font-mono">
-                                                        .{results.cookieInfo.element.className.split(' ')[0]}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div>
-                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                                    Button Text
-                                                </div>
-                                                <div className="text-sm font-medium mt-1 truncate">
-                                                    "{results.cookieInfo.element.text}"
-                                                </div>
-                                                {results.cookieInfo.element?.id && (
-                                                    <div className="text-xs text-muted-foreground mt-1 font-mono">
-                                                        #{results.cookieInfo.element.id}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                {/* Action Details */}
-                                {results.cookieInfo.message && (
-                                    <div className="pt-3 border-t border-border">
-                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Action Details
-                                        </div>
-                                        <div className="text-sm mt-2 text-muted-foreground">
-                                            {results.cookieInfo.message}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* CMP Additional Info */}
-                                {results.cookieInfo.cmp?.platform && (
-                                    <div className="pt-2 border-t border-border">
-                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Platform Integration
-                                        </div>
-                                        <div className="text-sm mt-1">
-                                            {results.cookieInfo.cmp.platform}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <PrivacyCookies results={results} />
 
                 {/* Scan Metadata */}
                 <Card>
