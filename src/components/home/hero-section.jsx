@@ -28,9 +28,9 @@ export function HeroSection() {
 					</div>
 
 					{/* Right Side - Texture Image (40% width, 80% height) */}
-					<div className="w-full md:w-[40%] flex-shrink-0 absolute right-0 z-0">
+					<div className="w-full md:w-[40%] flex-shrink-0 absolute right-0 z-0 overflow-hidden">
 						<div 
-							className="relative w-full h-[60vh] md:h-[80vh] rounded overflow-hidden"
+							className="relative w-full h-[60vh] md:h-[80vh] rounded overflow-hidden animate-fade-in-left"
 							style={{
 								backgroundImage: 'url(/textures/h-co-jQ0RUW5kVGc-unsplash.jpg)',
 								backgroundSize: 'cover',

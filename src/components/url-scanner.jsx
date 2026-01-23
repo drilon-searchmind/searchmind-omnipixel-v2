@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 export function UrlScanner({ className, onSubmit }) {
     const [url, setUrl] = React.useState("");
     const [isLoading, setIsLoading] = React.useState(false);
+    const [hasBeenFocused, setHasBeenFocused] = React.useState(false);
     const router = useRouter();
 
     const handleSubmit = async (e) => {
@@ -33,13 +34,19 @@ export function UrlScanner({ className, onSubmit }) {
 
     return (
         <form onSubmit={handleSubmit} className={cn("w-full relative z-10", className)}>
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row transition-all duration-200 animate-fade-in-up">
                 <Input
                     type="url"
                     placeholder="https://example.com"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="flex-1 h-12 text-base border-border/60 focus:border-foreground/40 bg-background"
+                    onFocus={() => setHasBeenFocused(true)}
+                    className={cn(
+                        "flex-1 h-12 text-base bg-background",
+                        hasBeenFocused
+                            ? "border-border/60 focus:border-foreground/40"
+                            : "border-foreground animate-pulse shadow-sm"
+                    )}
                     disabled={isLoading}
                 />
                 <Button 
