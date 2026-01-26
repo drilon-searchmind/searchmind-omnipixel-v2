@@ -8,7 +8,7 @@ export function PerformanceMetrics({ results }) {
             largestContentfulPaint: { good: 2500, needsImprovement: 4000 },
             firstInputDelay: { good: 100, needsImprovement: 300 },
             cumulativeLayoutShift: { good: 0.1, needsImprovement: 0.25 },
-            totalBlockingTime: { good: 200, needsImprovement: 600 },
+            timeToFirstByte: { good: 600, needsImprovement: 1000 },
             speedIndex: { good: 3400, needsImprovement: 5800 },
             timeToInteractive: { good: 3800, needsImprovement: 7300 }
         };
@@ -41,7 +41,7 @@ export function PerformanceMetrics({ results }) {
     ];
 
     const performanceMetrics = [
-        { key: 'totalBlockingTime', label: 'Total Blocking Time', shortLabel: 'TBT', value: performance.totalBlockingTime, unit: 'ms' },
+        { key: 'timeToFirstByte', label: 'First Byte Time', shortLabel: 'FBT', value: performance.timeToFirstByte, unit: 'ms' },
         { key: 'speedIndex', label: 'Speed Index', shortLabel: 'SI', value: performance.speedIndex, unit: 'ms' },
         { key: 'timeToInteractive', label: 'Time to Interactive', shortLabel: 'TTI', value: performance.timeToInteractive, unit: 'ms' },
         { key: 'loadTime', label: 'Page Load Time', shortLabel: 'Load', value: performance.loadTime, unit: 's' },
@@ -103,10 +103,8 @@ export function PerformanceMetrics({ results }) {
                                 </div>
                             </div>
                             <div className="text-right space-y-1">
-                                <div className="text-xs text-white/50 uppercase tracking-wide">Accessibility</div>
-                                <div className="text-lg font-light text-white">{performance.accessibilityScore || 'N/A'}</div>
-                                <div className="text-xs text-white/50 uppercase tracking-wide">SEO</div>
-                                <div className="text-lg font-light text-white">{performance.seoScore || 'N/A'}</div>
+                                <div className="text-xs text-white/50 uppercase tracking-wide">Best Practices</div>
+                                <div className="text-lg font-light text-white">{performance.bestPracticesScore || 'N/A'}</div>
                             </div>
                         </div>
                     </div>

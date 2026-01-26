@@ -195,14 +195,15 @@ function ResultsContent() {
                         compliance: 88
                     },
                     performance: scanData.performance || {
-                        loadTime: 2.3,
-                        firstContentfulPaint: 1.2,
-                        largestContentfulPaint: 3.1,
+                        performanceScore: 78,
+                        firstContentfulPaint: 1200,
+                        largestContentfulPaint: 3100,
                         firstInputDelay: 45,
                         cumulativeLayoutShift: 0.08,
-                        totalBlockingTime: 120,
-                        speedIndex: 2.8,
-                        timeToInteractive: 2.5
+                        timeToFirstByte: 450,
+                        speedIndex: 2800,
+                        timeToInteractive: 2500,
+                        loadTime: 2.3
                     },
                     gtmAnalysis: {
                         containers: [],
@@ -277,16 +278,17 @@ function ResultsContent() {
             },
 
             // Core Web Vitals and performance metrics
-            performance: {
-                loadTime: 2.3,
-                firstContentfulPaint: 1.2,
-                largestContentfulPaint: 3.1,
-                firstInputDelay: 45,
-                cumulativeLayoutShift: 0.08,
-                totalBlockingTime: 120,
-                speedIndex: 2.8,
-                timeToInteractive: 2.5
-            },
+                    performance: {
+                        performanceScore: 78,
+                        firstContentfulPaint: 1200,
+                        largestContentfulPaint: 3100,
+                        firstInputDelay: 45,
+                        cumulativeLayoutShift: 0.08,
+                        timeToFirstByte: 450,
+                        speedIndex: 2800,
+                        timeToInteractive: 2500,
+                        loadTime: 2.3
+                    },
 
             // GTM Analysis placeholder (to be implemented)
             gtmAnalysis: {

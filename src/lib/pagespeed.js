@@ -18,7 +18,7 @@ export async function fetchPageSpeedInsights(url) {
             };
         }
 
-        const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&category=performance&category=accessibility&category=best-practices&category=seo&key=${apiKey}`;
+        const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&category=performance&key=${apiKey}`;
         
         const response = await fetch(apiUrl, {
             headers: {
@@ -38,11 +38,8 @@ export async function fetchPageSpeedInsights(url) {
         const categories = lighthouse.categories;
 
         const performanceData = {
-            // Overall scores
+            // Overall scores (only performance available with single category request)
             performanceScore: Math.round(categories.performance.score * 100),
-            accessibilityScore: Math.round(categories.accessibility.score * 100),
-            bestPracticesScore: Math.round(categories['best-practices'].score * 100),
-            seoScore: Math.round(categories.seo.score * 100),
 
             // Core Web Vitals
             firstContentfulPaint: Math.round(audits['first-contentful-paint'].numericValue),
@@ -77,18 +74,13 @@ export async function fetchPageSpeedInsights(url) {
 function getMockPageSpeedData() {
     return {
         performanceScore: 78,
-        accessibilityScore: 85,
-        bestPracticesScore: 92,
-        seoScore: 88,
         firstContentfulPaint: 1200,
         largestContentfulPaint: 3100,
         firstInputDelay: 45,
         cumulativeLayoutShift: 0.08,
-        totalBlockingTime: 120,
+        timeToFirstByte: 450,
         speedIndex: 2800,
         timeToInteractive: 2500,
-        loadTime: 2.3,
-        timeToFirstByte: 450,
-        domContentLoaded: 1800
+        loadTime: 2.3
     };
 }
