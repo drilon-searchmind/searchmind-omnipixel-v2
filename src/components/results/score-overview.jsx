@@ -11,6 +11,20 @@ export function ScoreOverview({ results, totalScore }) {
                     <div className="text-xs text-background/60">
                         Combined technical score
                     </div>
+                    {/* Color indicator bar */}
+                    <div className="w-full h-1 bg-background/20 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full transition-all duration-300"
+                            style={{
+                                width: `${totalScore}%`,
+                                background: totalScore < 33 
+                                    ? 'linear-gradient(to right, #ef4444, #f97316)' 
+                                    : totalScore < 66 
+                                    ? 'linear-gradient(to right, #f97316, #22c55e)' 
+                                    : 'linear-gradient(to right, #22c55e, #16a34a)'
+                            }}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -24,6 +38,20 @@ export function ScoreOverview({ results, totalScore }) {
                     <div className="text-3xl font-light text-foreground">{results.scores.performance}/100</div>
                     <div className="text-xs text-foreground/50">
                         Core Web Vitals optimized
+                    </div>
+                    {/* Color indicator bar */}
+                    <div className="w-full h-1 bg-foreground/10 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full transition-all duration-300"
+                            style={{
+                                width: `${results.scores.performance}%`,
+                                background: results.scores.performance < 33 
+                                    ? 'linear-gradient(to right, #ef4444, #f97316)' 
+                                    : results.scores.performance < 66 
+                                    ? 'linear-gradient(to right, #f97316, #22c55e)' 
+                                    : 'linear-gradient(to right, #22c55e, #16a34a)'
+                            }}
+                        />
                     </div>
                 </div>
             </div>

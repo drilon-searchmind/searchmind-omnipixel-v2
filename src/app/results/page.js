@@ -350,6 +350,7 @@ function ResultsContent() {
                         compliance: 88
                     }
                     });
+                    
                     console.log('✅ Results set with real scan data');
                     return;
                 } catch (error) {
@@ -475,19 +476,13 @@ function ResultsContent() {
         );
     }
 
-    // Calculate overall score based on available data
-    const calculateOverallScore = (results) => {
-        const weights = {
-            performance: 0.30,  // Performance is important (30%)
-            privacy: 0.25,      // Privacy compliance (25%)
-            tracking: 0.25,     // Tracking implementation quality (25%)
-            compliance: 0.20    // General compliance (20%)
-        };
-
-        // Base scores from results
+    // Calculate individual scores and overall score
+    const calculateScores = (results) => {
+        // Start with base scores from results (but tracking will be recalculated from scratch)
         let performanceScore = results.scores?.performance || 0;
         let privacyScore = results.scores?.privacy || 0;
-        let trackingScore = results.scores?.tracking || 0;
+        // trackingScore will be calculated from scratch, ignore initial value
+        let trackingScore = 0; // Will be reset to 50 below
         let complianceScore = results.scores?.compliance || 0;
 
         // Adjust performance score based on actual performance metrics
@@ -507,9 +502,26 @@ function ResultsContent() {
             privacyScore = Math.min(100, privacyScore + 5); // Bonus for high-confidence CMP detection
         }
 
-        // Adjust tracking score based on GTM implementation quality
+        // Calculate tracking score - BE MORE CRITICAL
+        // Start from a base score (IGNORE initial tracking score from results)
+        trackingScore = 50; // Start at 50 (neutral)
+        
+        const marketingScripts = results.marketingScripts || {};
+        
+        console.log('Calculating tracking score:', {
+            gtmFound: results.gtmInfo?.found,
+            ga4Found: marketingScripts.ga4?.found,
+            serverSideTracking: results.serverSideTracking,
+            metaFound: marketingScripts.meta?.found,
+            tiktokFound: marketingScripts.tiktok?.found,
+            linkedinFound: marketingScripts.linkedin?.found,
+            googleAdsFound: marketingScripts.googleAds?.found,
+            consentModeV2: results.tagstackInfo?.consentModeV2
+        });
+        
+        // GTM Implementation (Base requirement - 30 points)
         if (results.gtmInfo?.found) {
-            trackingScore = Math.min(100, trackingScore + 15); // Base bonus for GTM presence
+            trackingScore += 30; // Base bonus for GTM presence
             
             // Additional bonuses from Tagstack analysis
             if (results.tagstackInfo) {
@@ -518,28 +530,74 @@ function ResultsContent() {
                 
                 if (containerStats?.[primaryContainer]) {
                     const stats = containerStats[primaryContainer];
-                    // Bonus for having tags configured
+                    // Bonus for having tags configured (up to 10 points)
                     if (stats.tags > 0) {
-                        trackingScore = Math.min(100, trackingScore + 5);
+                        trackingScore += Math.min(10, stats.tags / 2);
                     }
                     // Penalty for paused tags (indicates poor maintenance)
                     if (stats.pausedTags > 0) {
-                        trackingScore = Math.max(0, trackingScore - (stats.pausedTags * 2));
+                        trackingScore -= Math.min(15, stats.pausedTags * 3);
                     }
-                    // Bonus for active tags
+                    // Bonus for active tags (up to 10 points)
                     if (stats.activeTags > 0) {
-                        trackingScore = Math.min(100, trackingScore + Math.min(10, stats.activeTags));
+                        trackingScore += Math.min(10, stats.activeTags / 2);
                     }
                 }
                 
-                // Bonus for Consent Mode V2 in tracking context
+                // Bonus for Consent Mode V2 (10 points)
                 if (results.tagstackInfo.consentModeV2) {
-                    trackingScore = Math.min(100, trackingScore + 10);
+                    trackingScore += 10;
                 }
             }
         } else {
-            // Penalty for no GTM found
-            trackingScore = Math.max(0, trackingScore - 20);
+            // Severe penalty for no GTM found
+            trackingScore -= 30;
+        }
+        
+        // GA4 Implementation (10 points)
+        if (marketingScripts.ga4?.found) {
+            trackingScore += 10;
+            // Bonus for enhanced ecommerce (5 points)
+            if (marketingScripts.ga4.enhancedEcommerce) {
+                trackingScore += 5;
+            }
+        } else {
+            trackingScore -= 10; // Penalty for missing GA4
+        }
+        
+        // Server-side Tracking (15 points) - CRITICAL MISSING FEATURE
+        if (results.serverSideTracking) {
+            trackingScore += 15;
+        } else {
+            trackingScore -= 15; // Penalty for missing server-side tracking
+        }
+        
+        // Meta Pixel (5 points)
+        if (marketingScripts.meta?.found) {
+            trackingScore += 5;
+        } else {
+            trackingScore -= 5; // Penalty for missing Meta Pixel
+        }
+        
+        // TikTok Pixel (5 points)
+        if (marketingScripts.tiktok?.found) {
+            trackingScore += 5;
+        } else {
+            trackingScore -= 5; // Penalty for missing TikTok Pixel
+        }
+        
+        // LinkedIn Insight (5 points)
+        if (marketingScripts.linkedin?.found) {
+            trackingScore += 5;
+        } else {
+            trackingScore -= 5; // Penalty for missing LinkedIn Insight
+        }
+        
+        // Google Ads (5 points)
+        if (marketingScripts.googleAds?.found) {
+            trackingScore += 5;
+        } else {
+            trackingScore -= 5; // Penalty for missing Google Ads
         }
 
         // Adjust compliance score based on various factors
@@ -553,18 +611,57 @@ function ResultsContent() {
             complianceScore = Math.min(100, complianceScore + 5); // Bonus for server-side tracking
         }
 
-        // Calculate weighted average
-        const totalScore = Math.round(
-            (performanceScore * weights.performance) +
-            (privacyScore * weights.privacy) +
-            (trackingScore * weights.tracking) +
-            (complianceScore * weights.compliance)
+        // Clamp all scores between 0-100
+        performanceScore = Math.max(0, Math.min(100, performanceScore));
+        privacyScore = Math.max(0, Math.min(100, privacyScore));
+        trackingScore = Math.max(0, Math.min(100, trackingScore));
+        complianceScore = Math.max(0, Math.min(100, complianceScore));
+        
+        console.log('Final calculated scores:', {
+            performance: performanceScore,
+            privacy: privacyScore,
+            tracking: trackingScore,
+            compliance: complianceScore
+        });
+
+        // Calculate overall score as simple average of the 4 scores
+        const overallScore = Math.round(
+            (performanceScore + privacyScore + trackingScore + complianceScore) / 4
         );
 
-        return Math.max(0, Math.min(100, totalScore)); // Clamp between 0-100
+        return {
+            performance: performanceScore,
+            privacy: privacyScore,
+            tracking: trackingScore,
+            compliance: complianceScore,
+            overall: Math.max(0, Math.min(100, overallScore))
+        };
     };
 
-    const totalScore = calculateOverallScore(results);
+    // Calculate scores based on current results
+    const calculatedScores = calculateScores(results);
+    const totalScore = calculatedScores.overall;
+    
+    // Use calculated scores for display - ensure tracking score is from calculation, not initial value
+    const displayResults = {
+        ...results,
+        scores: {
+            performance: Math.round(calculatedScores.performance),
+            privacy: Math.round(calculatedScores.privacy),
+            tracking: Math.round(calculatedScores.tracking), // Use calculated value, not initial
+            compliance: Math.round(calculatedScores.compliance)
+        }
+    };
+    
+    // Debug log to verify scores
+    if (results.gtmInfo?.found) {
+        console.log('Score calculation debug:', {
+            initialTracking: results.scores?.tracking,
+            calculatedTracking: calculatedScores.tracking,
+            displayTracking: displayResults.scores.tracking,
+            marketingScripts: results.marketingScripts
+        });
+    }
 
 
     return (
@@ -585,7 +682,7 @@ function ResultsContent() {
                                     Technical Analysis Report
                                 </h1>
                                 <p className="text-sm text-foreground/50 font-mono">
-                                    {results.url}
+                                    {displayResults.url}
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
@@ -606,7 +703,7 @@ function ResultsContent() {
                                 </Button>
                                 <Button 
                                     variant="outline" 
-                                    onClick={() => router.push("/scan?url=" + encodeURIComponent(results.url))}
+                                    onClick={() => router.push("/scan?url=" + encodeURIComponent(displayResults.url))}
                                 >
                                     Re-scan
                                 </Button>
@@ -620,7 +717,7 @@ function ResultsContent() {
                         </div>
 
                         {/* Real Scan Data Display */}
-                        {results.pageInfo && (
+                        {displayResults.pageInfo && (
                             <div className="border border-border/40 rounded p-6 space-y-6">
                                 <div className="space-y-1">
                                     <h2 className="text-lg font-light text-foreground">Live Scan Results</h2>
@@ -628,52 +725,52 @@ function ResultsContent() {
                                 </div>
                                 <div className="grid gap-6 md:grid-cols-3">
                                     <div className="space-y-1">
-                                        <div className="text-3xl font-light text-foreground">{results.pageInfo.scripts}</div>
+                                        <div className="text-3xl font-light text-foreground">{displayResults.pageInfo.scripts}</div>
                                         <div className="text-xs text-foreground/50">Scripts Found</div>
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="text-3xl font-light text-foreground">{results.pageInfo.links}</div>
+                                        <div className="text-3xl font-light text-foreground">{displayResults.pageInfo.links}</div>
                                         <div className="text-xs text-foreground/50">Links Found</div>
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="text-3xl font-light text-foreground">{results.pageInfo.images}</div>
+                                        <div className="text-3xl font-light text-foreground">{displayResults.pageInfo.images}</div>
                                         <div className="text-xs text-foreground/50">Images Found</div>
                                     </div>
                                 </div>
                                 <div className="pt-4 border-t border-border/40 space-y-2">
                                     <div className="text-sm">
-                                        <span className="text-foreground/50">Page Title:</span> <span className="text-foreground">{results.pageInfo.title || 'N/A'}</span>
+                                        <span className="text-foreground/50">Page Title:</span> <span className="text-foreground">{displayResults.pageInfo.title || 'N/A'}</span>
                                     </div>
                                     <div className="text-sm">
-                                        <span className="text-foreground/50">Cookies:</span> <span className="text-foreground">{results.pageInfo.cookies || 0}</span>
+                                        <span className="text-foreground/50">Cookies:</span> <span className="text-foreground">{displayResults.pageInfo.cookies || 0}</span>
                                     </div>
                                 </div>
                             </div>
                         )}
 
                 {/* Overall Score & Status */}
-                <ScoreOverview results={results} totalScore={totalScore} />
+                <ScoreOverview results={displayResults} totalScore={totalScore} />
 
                 {/* Detailed Scores */}
-                <DetailedScores results={results} />
+                <DetailedScores results={displayResults} />
 
                 {/* Marketing Scripts Checklist */}
-                <MarketingScripts results={results} />
+                <MarketingScripts results={displayResults} />
 
                 {/* Performance Metrics */}
-                <PerformanceMetrics results={results} />
+                <PerformanceMetrics results={displayResults} />
 
                 {/* GTM Analysis Section */}
-                <GTMAnalysis results={results} />
+                <GTMAnalysis results={displayResults} />
 
                 {/* Tagstack Insights - Container Health */}
-                <TagstackInsights results={results} />
+                <TagstackInsights results={displayResults} />
 
                 {/* Martech Summary */}
-                <MartechSummary results={results} />
+                <MartechSummary results={displayResults} />
 
                 {/* Cookie Status */}
-                <PrivacyCookies results={results} />
+                <PrivacyCookies results={displayResults} />
 
                         {/* Scan Metadata */}
                         <div className="border border-border/40 rounded p-6 space-y-6">
@@ -681,11 +778,11 @@ function ResultsContent() {
                             <div className="grid gap-6 md:grid-cols-2">
                                 <div className="space-y-1">
                                     <div className="text-xs text-foreground/50 uppercase tracking-wide">Target URL</div>
-                                    <div className="font-mono text-sm text-foreground break-all">{results.url}</div>
+                                    <div className="font-mono text-sm text-foreground break-all">{displayResults.url}</div>
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs text-foreground/50 uppercase tracking-wide">Scan Timestamp</div>
-                                    <div className="text-sm text-foreground">{new Date(results.scannedAt).toLocaleString()}</div>
+                                    <div className="text-sm text-foreground">{new Date(displayResults.scannedAt).toLocaleString()}</div>
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs text-foreground/50 uppercase tracking-wide">Scanner Version</div>
