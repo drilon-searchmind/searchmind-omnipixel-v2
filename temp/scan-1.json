@@ -1,0 +1,361 @@
+{
+    "url": "https://pompdelux.dk/",
+    "steps": [
+        {
+            "id": 1,
+            "status": "completed",
+            "result": {
+                "success": true,
+                "message": "Scanner initialized successfully"
+            }
+        },
+        {
+            "id": 2,
+            "status": "completed",
+            "result": {
+                "success": true,
+                "message": "Successfully navigated to https://pompdelux.dk/"
+            }
+        },
+        {
+            "id": 3,
+            "status": "completed",
+            "result": {
+                "success": true,
+                "message": "Page fully loaded"
+            }
+        },
+        {
+            "id": 4,
+            "status": "completed",
+            "result": {
+                "success": true,
+                "provider": "CookieInformation",
+                "message": "Accepted cookies using cmp-specific detection (CookieInformation): \"Accepter alle\"",
+                "element": {
+                    "tagName": "BUTTON",
+                    "id": "",
+                    "className": "coi-banner__accept",
+                    "text": "Accepter alle"
+                },
+                "method": "cmp-specific",
+                "cmp": {
+                    "name": "CookieInformation",
+                    "confidence": "high",
+                    "elements": 167,
+                    "scripts": 2,
+                    "version": "Script detected"
+                },
+                "cookies": {
+                    "count": 4,
+                    "keys": [
+                        "localization",
+                        "cart_currency",
+                        "cart",
+                        "_gcl_au"
+                    ],
+                    "domains": 4
+                }
+            }
+        },
+        {
+            "id": 5,
+            "status": "completed",
+            "result": {
+                "success": true,
+                "message": "Performance metrics retrieved"
+            }
+        },
+        {
+            "id": 6,
+            "status": "completed",
+            "result": {
+                "success": true,
+                "message": "GTM scanning completed"
+            }
+        },
+        {
+            "id": 7,
+            "status": "completed",
+            "result": {
+                "success": true,
+                "message": "Tagstack analysis completed"
+            }
+        }
+    ],
+    "pageInfo": {
+        "title": "Børnetøj fra POMPdeLUX | Skandinavisk Design",
+        "url": "https://pompdelux.dk/",
+        "scripts": 100,
+        "links": 448,
+        "images": 47,
+        "cookies": 6
+    },
+    "success": true,
+    "error": null,
+    "cookieInfo": {
+        "detected": true,
+        "provider": "CookieInformation",
+        "accepted": true,
+        "message": "Accepted cookies using cmp-specific detection (CookieInformation): \"Accepter alle\"",
+        "method": "cmp-specific",
+        "cmp": {
+            "name": "CookieInformation",
+            "confidence": "high",
+            "elements": 167,
+            "scripts": 2,
+            "version": "Script detected"
+        },
+        "element": {
+            "tagName": "BUTTON",
+            "id": "",
+            "className": "coi-banner__accept",
+            "text": "Accepter alle"
+        },
+        "cookies": {
+            "count": 4,
+            "keys": [
+                "localization",
+                "cart_currency",
+                "cart",
+                "_gcl_au"
+            ],
+            "domains": 4
+        },
+        "tagstackCmp": false
+    },
+    "performance": {
+        "performanceScore": 73,
+        "firstContentfulPaint": 791,
+        "largestContentfulPaint": 2916,
+        "firstInputDelay": 161,
+        "cumulativeLayoutShift": 0.0005812359439654252,
+        "totalBlockingTime": 216,
+        "speedIndex": 1911,
+        "timeToInteractive": 3431,
+        "loadTime": 0,
+        "timeToFirstByte": 12,
+        "domContentLoaded": 0
+    },
+    "gtmInfo": {
+        "found": true,
+        "containers": [
+            "GTM-WP9Q2FZV"
+        ],
+        "count": 1
+    },
+    "tagstackInfo": {
+        "gtmContainers": [
+            {
+                "id": "GTM-WP9Q2FZV",
+                "entityType": "GTM Container",
+                "cmp": false,
+                "consentMode": true,
+                "consentDefault": {
+                    "functionality_storage": "denied",
+                    "ad_storage": "denied",
+                    "ad_user_data": "denied",
+                    "personalization_storage": "denied",
+                    "analytics_storage": "denied",
+                    "ad_personalization": "denied"
+                }
+            }
+        ],
+        "ga4Streams": [
+            {
+                "id": "G-HNXSBKHFJ6",
+                "entityType": "GA4 Stream",
+                "enhancedMeasurement": [
+                    {
+                        "name": "Outbound Click",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Pageview",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Scroll",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Site Search",
+                        "type": "Enhanced Measurement"
+                    }
+                ]
+            },
+            {
+                "id": "G-FYYHFMJ9LG",
+                "entityType": "GA4 Stream",
+                "enhancedMeasurement": [
+                    {
+                        "name": "Outbound Click",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Pageview",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Scroll",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Site Search",
+                        "type": "Enhanced Measurement"
+                    }
+                ],
+                "linking": [
+                    {
+                        "name": "Google Ads Linking",
+                        "type": "Linking"
+                    }
+                ]
+            },
+            {
+                "id": "G-Q3143NKCC8",
+                "entityType": "GA4 Stream",
+                "enhancedMeasurement": [
+                    {
+                        "name": "Outbound Click",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Pageview",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Scroll",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Site Search",
+                        "type": "Enhanced Measurement"
+                    }
+                ],
+                "linking": [
+                    {
+                        "name": "Google Ads Linking",
+                        "type": "Linking"
+                    }
+                ]
+            },
+            {
+                "id": "G-932EJZFCGM",
+                "entityType": "GA4 Stream",
+                "enhancedMeasurement": [
+                    {
+                        "name": "Outbound Click",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Pageview",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Scroll",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Site Search",
+                        "type": "Enhanced Measurement"
+                    }
+                ],
+                "linking": [
+                    {
+                        "name": "Google Ads Linking",
+                        "type": "Linking"
+                    }
+                ]
+            },
+            {
+                "id": "G-V7ZTDN78DW",
+                "entityType": "GA4 Stream",
+                "enhancedMeasurement": [
+                    {
+                        "name": "Outbound Click",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Pageview",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Scroll",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Site Search",
+                        "type": "Enhanced Measurement"
+                    }
+                ],
+                "linking": [
+                    {
+                        "name": "Google Ads Linking",
+                        "type": "Linking"
+                    }
+                ]
+            },
+            {
+                "id": "G-DBYJP4WYGX",
+                "entityType": "GA4 Stream",
+                "enhancedMeasurement": [
+                    {
+                        "name": "Outbound Click",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Pageview",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Scroll",
+                        "type": "Enhanced Measurement"
+                    },
+                    {
+                        "name": "Site Search",
+                        "type": "Enhanced Measurement"
+                    }
+                ],
+                "linking": [
+                    {
+                        "name": "Google Ads Linking",
+                        "type": "Linking"
+                    }
+                ]
+            }
+        ],
+        "consentModeV2": true,
+        "cmp": false,
+        "consentDefaults": {
+            "functionality_storage": "denied",
+            "ad_storage": "denied",
+            "ad_user_data": "denied",
+            "personalization_storage": "denied",
+            "analytics_storage": "denied",
+            "ad_personalization": "denied"
+        },
+        "detectedIds": {
+            "ga4": [
+                "G-HNXSBKHFJ6",
+                "G-FYYHFMJ9LG",
+                "G-Q3143NKCC8",
+                "G-932EJZFCGM",
+                "G-V7ZTDN78DW",
+                "G-DBYJP4WYGX"
+            ],
+            "facebookPixel": [],
+            "googleAds": []
+        },
+        "containerStats": {
+            "GTM-WP9Q2FZV": {
+                "tags": 15,
+                "activeTags": 8,
+                "pausedTags": 7,
+                "variables": 54,
+                "triggers": 10
+            }
+        }
+    },
+    "consentModeV2": true
+}

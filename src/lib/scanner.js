@@ -768,8 +768,98 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             result: { success: true, message: 'GTM scanning completed' }
         });
 
-        // Step 7: Finalizing (send progress update)
-        onProgress(7, 'Finalizing scan results...');
+        // Step 7: Fetch Tagstack Analysis
+        console.log('Executing step 7: Fetch Tagstack analysis');
+        onProgress(7, 'Analyzing GTM container with Tagstack...');
+        try {
+            if (results.gtmInfo?.found && results.gtmInfo.containers.length > 0) {
+                const { fetchTagstackData, processTagstackData } = await import('@/lib/tagstack');
+                
+                // Fetch Tagstack data for each GTM container
+                const tagstackPromises = results.gtmInfo.containers.map(containerId => 
+                    fetchTagstackData(containerId)
+                );
+                
+                const tagstackResults = await Promise.all(tagstackPromises);
+                
+                // Process successful results
+                const successfulResults = tagstackResults
+                    .filter(r => r.success)
+                    .map(r => r.data);
+                
+                if (successfulResults.length > 0) {
+                    // Process and merge Tagstack data
+                    const processedData = processTagstackData({
+                        containers: Object.assign({}, ...successfulResults.map(r => r.containers))
+                    });
+                    
+                    // Store processed data (optimized - don't include full raw response to reduce size)
+                    // Only keep essential data, exclude detailed tags/variables/triggers arrays
+                    results.tagstackInfo = {
+                        gtmContainers: processedData.gtmContainers.map(c => ({
+                            id: c.id,
+                            entityType: c.entityType,
+                            cmp: c.cmp,
+                            consentMode: c.consentMode,
+                            consentDefault: c.consentDefault
+                            // Exclude: tags, variables, triggers arrays (too large)
+                        })),
+                        ga4Streams: processedData.ga4Streams.map(s => ({
+                            id: s.id,
+                            entityType: s.entityType,
+                            enhancedMeasurement: s.enhancedMeasurement?.map(em => ({
+                                name: em.name,
+                                type: em.type
+                            })),
+                            linking: s.linking?.map(l => ({
+                                name: l.name,
+                                type: l.type
+                            }))
+                        })),
+                        consentModeV2: processedData.consentModeV2,
+                        cmp: processedData.cmp,
+                        consentDefaults: processedData.consentDefaults,
+                        detectedIds: processedData.detectedIds,
+                        containerStats: processedData.containerStats
+                        // Exclude: tags, variables, triggers arrays (available via containerStats counts)
+                    };
+                    
+                    // Update Consent Mode V2 status from Tagstack
+                    if (results.tagstackInfo.consentModeV2 !== undefined) {
+                        results.consentModeV2 = results.tagstackInfo.consentModeV2;
+                    }
+                    
+                    // Update CMP detection if available
+                    if (results.tagstackInfo.cmp !== null && results.tagstackInfo.cmp !== undefined) {
+                        if (results.cookieInfo) {
+                            results.cookieInfo.tagstackCmp = results.tagstackInfo.cmp;
+                        }
+                    }
+                    
+                    console.log('Tagstack analysis completed:', {
+                        gtmContainers: results.tagstackInfo.gtmContainers.length,
+                        ga4Streams: results.tagstackInfo.ga4Streams.length,
+                        consentModeV2: results.tagstackInfo.consentModeV2,
+                        detectedIds: results.tagstackInfo.detectedIds
+                    });
+                } else {
+                    console.warn('No successful Tagstack results');
+                    results.tagstackInfo = null;
+                }
+            } else {
+                console.log('No GTM containers found, skipping Tagstack analysis');
+                results.tagstackInfo = null;
+            }
+        } catch (error) {
+            console.error('Tagstack analysis error:', error);
+            results.tagstackInfo = null;
+        }
+
+        results.steps.push({
+            id: 7,
+            status: 'completed',
+            result: { success: true, message: 'Tagstack analysis completed' }
+        });
 
         results.success = true;
         console.log('Initial scan completed successfully');

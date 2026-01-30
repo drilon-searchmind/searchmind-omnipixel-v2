@@ -42,7 +42,7 @@ export function MarketingScripts({ results }) {
                                 <div>
                                     <div className="font-light text-foreground">{scriptNames[key]}</div>
                                     {data.found && (
-                                        <div className="text-xs text-foreground/50 mt-0.5">
+                                        <div className="text-xs text-foreground/50 mt-0.5 space-y-0.5">
                                             {data.containers && data.containers.length > 0 ? (
                                                 <div>
                                                     {data.containers.length === 1 
@@ -53,9 +53,36 @@ export function MarketingScripts({ results }) {
                                             ) : data.containerId && (
                                                 <div>Container: {data.containerId}</div>
                                             )}
-                                            {data.measurementId && <div>Measurement: {data.measurementId}</div>}
-                                            {data.pixelId && <div>Pixel: {data.pixelId}</div>}
-                                            {data.conversionId && <div>Conversion: {data.conversionId}</div>}
+                                            {data.measurementIds && data.measurementIds.length > 0 ? (
+                                                <div>
+                                                    {data.measurementIds.length === 1 
+                                                        ? `Measurement: ${data.measurementIds[0]}`
+                                                        : `Measurements: ${data.measurementIds.join(', ')}`
+                                                    }
+                                                </div>
+                                            ) : data.measurementId && (
+                                                <div>Measurement: {data.measurementId}</div>
+                                            )}
+                                            {data.pixelIds && data.pixelIds.length > 0 ? (
+                                                <div>
+                                                    {data.pixelIds.length === 1 
+                                                        ? `Pixel: ${data.pixelIds[0]}`
+                                                        : `Pixels: ${data.pixelIds.join(', ')}`
+                                                    }
+                                                </div>
+                                            ) : data.pixelId && (
+                                                <div>Pixel: {data.pixelId}</div>
+                                            )}
+                                            {data.conversionIds && data.conversionIds.length > 0 ? (
+                                                <div>
+                                                    {data.conversionIds.length === 1 
+                                                        ? `Conversion: ${data.conversionIds[0]}`
+                                                        : `Conversions: ${data.conversionIds.join(', ')}`
+                                                    }
+                                                </div>
+                                            ) : data.conversionId && (
+                                                <div>Conversion: {data.conversionId}</div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
