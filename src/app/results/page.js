@@ -151,15 +151,19 @@ function ResultsContent() {
                     cookieInfo: scanData.cookieInfo || null,
                     // Use real performance data from scan
                     performance: scanData.performance || null,
+                    // Use real GTM info from scan
+                    gtmInfo: scanData.gtmInfo || null,
                     // Keep mock data for other sections (will be replaced later)
                     consentModeV2: true,
                     serverSideTracking: false,
                     marketingScripts: {
                         gtm: {
-                            found: true,
-                            containerId: "GTM-XXXXXXX",
-                            version: "v2",
-                            lastUpdated: "2024-01-15"
+                            found: scanData.gtmInfo?.found || false,
+                            containerId: scanData.gtmInfo?.containers?.[0] || null,
+                            containers: scanData.gtmInfo?.containers || [],
+                            count: scanData.gtmInfo?.count || 0,
+                            version: scanData.gtmInfo?.found ? "v2" : null,
+                            lastUpdated: null // Not available from scan
                         },
                         ga4: {
                             found: true,
@@ -205,11 +209,10 @@ function ResultsContent() {
                         timeToInteractive: 2500,
                         loadTime: 2.3
                     },
-                    gtmAnalysis: {
+                    gtmInfo: scanData.gtmInfo || {
+                        found: false,
                         containers: [],
-                        triggers: [],
-                        variables: [],
-                        tags: []
+                        count: 0
                     }
                 });
                 return;
@@ -236,10 +239,10 @@ function ResultsContent() {
             // Marketing scripts with detailed technical info
             marketingScripts: {
                 gtm: {
-                    found: true,
-                    containerId: "GTM-XXXXXXX",
-                    version: "v2",
-                    lastUpdated: "2024-01-15"
+                    found: false,
+                    containerId: null,
+                    version: null,
+                    lastUpdated: null
                 },
                 ga4: {
                     found: true,

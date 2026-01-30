@@ -10,7 +10,8 @@ const SCAN_STEPS = [
     { id: 3, title: "Waiting for Page Load", description: "Allowing page to load completely" },
     { id: 4, title: "Accepting Cookies", description: "Automatically accepting cookie consent" },
     { id: 5, title: "Analyzing Performance", description: "Fetching Core Web Vitals and metrics" },
-    { id: 6, title: "Analyzing Tracking Data", description: "Scanning for tracking pixels and scripts" },
+    { id: 6, title: "Scanning GTM Containers", description: "Detecting Google Tag Manager implementations" },
+    { id: 7, title: "Analyzing Tracking Data", description: "Scanning for tracking pixels and scripts" },
 ];
 
 function ScanContent() {
@@ -33,70 +34,79 @@ function ScanContent() {
 
     const startScanning = async (targetUrl) => {
         try {
-            // Step 1: Initialize (simulate)
-            setCurrentStep(1);
-            await delay(500);
-
-            // Step 2: Navigate to URL (call API)
-            setCurrentStep(2);
-
-            let response;
-            try {
-                console.log('Making API call to /api/scan with URL:', targetUrl);
-                response = await fetch('/api/scan', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ url: targetUrl }),
-                });
-
-                console.log('API response received:', response);
-                console.log('API response status:', response.status);
-                console.log('API response ok:', response.ok);
-                console.log('API response type:', typeof response);
-            } catch (fetchError) {
-                console.error('Fetch error:', fetchError);
-                throw new Error(`Network error: ${fetchError.message}`);
-            }
+            // Use Server-Sent Events for real-time progress updates
+            console.log('Starting scan with streaming updates for URL:', targetUrl);
+            
+            // Start the scan with streaming enabled
+            const response = await fetch('/api/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ url: targetUrl, stream: true }),
+            });
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('API error response:', errorText);
                 throw new Error(`API returned ${response.status}: ${errorText}`);
             }
 
-            let scanResults;
-            try {
-                scanResults = await response.json();
-                console.log('Scan results:', scanResults);
-            } catch (jsonError) {
-                console.error('JSON parse error:', jsonError);
-                throw new Error(`Failed to parse API response: ${jsonError.message}`);
+            // Read the stream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let scanResults = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                    console.log('Stream ended');
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            console.log('Received SSE data:', data);
+
+                            if (data.type === 'progress') {
+                                // Update UI step based on progress
+                                setCurrentStep(data.step);
+                                console.log(`Step ${data.step}: ${data.message}`);
+                            } else if (data.type === 'error') {
+                                throw new Error(data.message);
+                            } else if (data.type === 'complete') {
+                                if (data.success) {
+                                    scanResults = data.data;
+                                    console.log('Scan completed successfully:', scanResults);
+                                    
+                                    // Step 7: Finalizing (UI-only step)
+                                    setCurrentStep(7);
+                                    
+                                    // Wait a moment before redirecting
+                                    setTimeout(() => {
+                                        const resultsUrl = `/results?url=${encodeURIComponent(targetUrl)}&scanData=${encodeURIComponent(JSON.stringify(scanResults))}`;
+                                        router.push(resultsUrl);
+                                    }, 500);
+                                } else {
+                                    throw new Error(data.error || 'Scanning failed');
+                                }
+                            }
+                        } catch (parseError) {
+                            console.error('Failed to parse SSE data:', parseError, 'Line:', line);
+                        }
+                    }
+                }
             }
-
-            if (!scanResults.success) {
-                throw new Error(scanResults.data?.error || scanResults.message || 'Scanning failed');
-            }
-
-            // Steps 2-4 completed via API (includes cookie acceptance)
-            // Add visual progression for remaining steps
-            setCurrentStep(3);
-            await delay(500);
-            setCurrentStep(4);
-            await delay(500);
-            setCurrentStep(5);
-            await delay(2000); // Performance analysis takes time
-            setCurrentStep(6);
-
-            // Step 7: Analyze tracking data (simulate)
-            await delay(2000);
-
-            // Complete - redirect to results with scan data
-            const resultsUrl = `/results?url=${encodeURIComponent(targetUrl)}&scanData=${encodeURIComponent(JSON.stringify(scanResults.data))}`;
-            router.push(resultsUrl);
 
         } catch (err) {
+            console.error('Scan error:', err);
             setError(err.message);
             setIsScanning(false);
         }
@@ -135,6 +145,18 @@ function ScanContent() {
                         {url}
                     </p>
                 </div>
+
+                {/* Loading Indicator */}
+                {isScanning && (
+                    <div className="text-center space-y-3 pt-4">
+                        <div className="inline-block">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground/20 border-t-foreground"></div>
+                        </div>
+                        <p className="text-sm text-foreground/50">
+                            Please wait while we scan the website...
+                        </p>
+                    </div>
+                )}
 
                 {/* Steps */}
                 <div className="space-y-3">
@@ -194,18 +216,6 @@ function ScanContent() {
                         </div>
                     ))}
                 </div>
-
-                {/* Loading Indicator */}
-                {isScanning && (
-                    <div className="text-center space-y-3 pt-4">
-                        <div className="inline-block">
-                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground/20 border-t-foreground"></div>
-                        </div>
-                        <p className="text-sm text-foreground/50">
-                            Please wait while we scan the website...
-                        </p>
-                    </div>
-                )}
             </div>
         </div>
     );

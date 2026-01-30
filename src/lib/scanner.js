@@ -157,6 +157,21 @@ class WebsiteScanner {
     }
 
     /**
+     * Get full HTML content of the page
+     */
+    async getPageHTML() {
+        try {
+            if (!this.page) {
+                throw new Error('No page loaded');
+            }
+            const html = await this.page.content();
+            return { success: true, data: html };
+        } catch (error) {
+            return { success: false, message: `Failed to get HTML content: ${error.message}` };
+        }
+    }
+
+    /**
      * Clean up browser resources
      */
     async cleanup() {
@@ -669,6 +684,92 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             status: 'completed',
             result: { success: true, message: 'Performance metrics retrieved' }
         });
+
+        // Step 6: Scan for GTM Containers
+        console.log('Executing step 6: Scan for GTM containers');
+        onProgress(6, 'Scanning for Google Tag Manager containers...');
+        try {
+            // Get HTML content explicitly for GTM scanning
+            console.log('Getting HTML content for GTM scan...');
+            const htmlResult = await scanner.getPageHTML();
+            const htmlContent = htmlResult.success ? htmlResult.data : (results.pageInfo?.html || '');
+            console.log('HTML content length for GTM scan:', htmlContent.length);
+            console.log('HTML content preview (first 500 chars):', htmlContent.substring(0, 500));
+
+            // Create fetchScript function for third-party script fetching using Puppeteer
+            const fetchScript = async (scriptUrl) => {
+                if (!scanner.page) {
+                    throw new Error('No page available for fetching scripts');
+                }
+                // Use page.evaluate to fetch script without navigating away
+                const content = await scanner.page.evaluate(async (url) => {
+                    try {
+                        const response = await fetch(url, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                            }
+                        });
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        return await response.text();
+                    } catch (error) {
+                        throw new Error(`Failed to fetch: ${error.message}`);
+                    }
+                }, scriptUrl);
+                return content;
+            };
+
+            console.log('Importing GTM scanner module...');
+            const { scanForGTM } = await import('@/lib/gtm-scanner');
+            console.log('GTM scanner module imported successfully');
+            
+            console.log('Starting GTM scan with:');
+            console.log('  - HTML length:', htmlContent.length);
+            console.log('  - URL:', url);
+            console.log('  - fetchScript function:', typeof fetchScript);
+            
+            const gtmResult = await scanForGTM(htmlContent, url, fetchScript);
+            console.log('GTM scan result:', JSON.stringify(gtmResult, null, 2));
+
+            // REMOVED: checkGTMInBrowser() method doesn't exist
+            // Will add it back later if needed
+
+            results.gtmInfo = {
+                found: gtmResult.found,
+                containers: gtmResult.containers,
+                count: gtmResult.count
+            };
+
+            if (gtmResult.found) {
+                console.log(`✅ GTM containers found: ${gtmResult.containers.join(', ')}`);
+            } else {
+                console.log('❌ No GTM containers found');
+                console.log('Debug: Checking HTML for GTM patterns...');
+                // Quick debug check
+                const hasGTM = htmlContent.includes('googletagmanager') || htmlContent.includes('GTM-');
+                console.log('  - Contains "googletagmanager":', htmlContent.includes('googletagmanager'));
+                console.log('  - Contains "GTM-":', htmlContent.includes('GTM-'));
+                console.log('  - Contains "stapecdn":', htmlContent.includes('stapecdn'));
+                console.log('  - Contains "shop_id":', htmlContent.includes('shop_id'));
+            }
+        } catch (error) {
+            console.error('GTM scanning error:', error);
+            results.gtmInfo = {
+                found: false,
+                containers: [],
+                count: 0
+            };
+        }
+
+        results.steps.push({
+            id: 6,
+            status: 'completed',
+            result: { success: true, message: 'GTM scanning completed' }
+        });
+
+        // Step 7: Finalizing (send progress update)
+        onProgress(7, 'Finalizing scan results...');
 
         results.success = true;
         console.log('Initial scan completed successfully');

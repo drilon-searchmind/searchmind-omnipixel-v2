@@ -43,24 +43,72 @@ export async function POST(request) {
 
         console.log(`Starting scan for URL: ${url}`);
 
-        // Execute the scanning process
-        const scanResults = await executeInitialScan(url, (step, message) => {
-            console.log(`Step ${step}: ${message}`);
-        });
+        // Check if client wants streaming updates
+        const useStreaming = body.stream === true;
 
-        console.log('Scan completed:', scanResults.success ? 'success' : 'failed');
+        if (useStreaming) {
+            // Use Server-Sent Events for real-time progress
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream({
+                async start(controller) {
+                    const sendProgress = (step, message) => {
+                        const data = JSON.stringify({ type: 'progress', step, message });
+                        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                    };
 
-        if (!scanResults.success) {
-            return NextResponse.json(
-                { success: false, message: scanResults.error },
-                { status: 500 }
-            );
+                    const sendError = (error) => {
+                        const data = JSON.stringify({ type: 'error', message: error.message });
+                        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                    };
+
+                    try {
+                        const scanResults = await executeInitialScan(url, sendProgress);
+
+                        if (!scanResults.success) {
+                            sendError(new Error(scanResults.error));
+                            const data = JSON.stringify({ type: 'complete', success: false, error: scanResults.error });
+                            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                        } else {
+                            const data = JSON.stringify({ type: 'complete', success: true, data: scanResults });
+                            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                        }
+                    } catch (error) {
+                        sendError(error);
+                        const data = JSON.stringify({ type: 'complete', success: false, error: error.message });
+                        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                    } finally {
+                        controller.close();
+                    }
+                }
+            });
+
+            return new Response(stream, {
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                },
+            });
+        } else {
+            // Standard non-streaming response
+            const scanResults = await executeInitialScan(url, (step, message) => {
+                console.log(`Step ${step}: ${message}`);
+            });
+
+            console.log('Scan completed:', scanResults.success ? 'success' : 'failed');
+
+            if (!scanResults.success) {
+                return NextResponse.json(
+                    { success: false, message: scanResults.error },
+                    { status: 500 }
+                );
+            }
+
+            return NextResponse.json({
+                success: true,
+                data: scanResults
+            });
         }
-
-        return NextResponse.json({
-            success: true,
-            data: scanResults
-        });
 
     } catch (error) {
         console.error('Scan API error:', error);

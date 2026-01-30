@@ -43,10 +43,19 @@ export function MarketingScripts({ results }) {
                                     <div className="font-light text-foreground">{scriptNames[key]}</div>
                                     {data.found && (
                                         <div className="text-xs text-foreground/50 mt-0.5">
-                                            {data.containerId && `Container: ${data.containerId}`}
-                                            {data.measurementId && `Measurement: ${data.measurementId}`}
-                                            {data.pixelId && `Pixel: ${data.pixelId}`}
-                                            {data.conversionId && `Conversion: ${data.conversionId}`}
+                                            {data.containers && data.containers.length > 0 ? (
+                                                <div>
+                                                    {data.containers.length === 1 
+                                                        ? `Container: ${data.containers[0]}`
+                                                        : `Containers: ${data.containers.join(', ')}`
+                                                    }
+                                                </div>
+                                            ) : data.containerId && (
+                                                <div>Container: {data.containerId}</div>
+                                            )}
+                                            {data.measurementId && <div>Measurement: {data.measurementId}</div>}
+                                            {data.pixelId && <div>Pixel: {data.pixelId}</div>}
+                                            {data.conversionId && <div>Conversion: {data.conversionId}</div>}
                                         </div>
                                     )}
                                 </div>
