@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
     FaGoogle,
@@ -97,6 +97,8 @@ function ResultsContent() {
     const [activeSection, setActiveSection] = useState('overview');
     const [showMobileTOC, setShowMobileTOC] = useState(false);
     const [error, setError] = useState(null);
+    const [isExporting, setIsExporting] = useState(false);
+    const contentRef = useRef(null);
 
     // Intersection Observer for active section tracking
     useEffect(() => {
@@ -147,6 +149,135 @@ function ResultsContent() {
                 top: offsetTop,
                 behavior: 'smooth'
             });
+        }
+    };
+
+    const handleExportToPDF = async () => {
+        if (isExporting || !results) return;
+        
+        setIsExporting(true);
+        
+        try {
+            // Dynamically import libraries (client-side only)
+            // Use html2canvas-pro which supports modern CSS color functions like oklab()
+            const html2canvas = (await import('html2canvas-pro')).default;
+            const { jsPDF } = await import('jspdf');
+            
+            // Get the main content container (exclude sidebar)
+            const mainContent = document.querySelector('.flex-1.min-w-0') || 
+                               document.querySelector('.results-content-container .flex-1') ||
+                               document.querySelector('.results-content-container');
+            
+            if (!mainContent) {
+                console.error('Could not find content element to export');
+                setIsExporting(false);
+                return;
+            }
+            
+            // Generate filename from URL
+            const urlSlug = displayResults.url
+                ?.replace(/https?:\/\//, '')
+                .replace(/\/$/, '')
+                .replace(/\//g, '-')
+                .substring(0, 50) || 'report';
+            const dateStr = new Date().toISOString().split('T')[0];
+            const filename = `omnipixel-report-${urlSlug}-${dateStr}.pdf`;
+            
+            // Store original styles to restore later
+            const elementsToHide = [];
+            
+            // Hide sidebar TOC
+            const sidebarTOC = document.querySelector('.hidden.lg\\:block');
+            if (sidebarTOC) {
+                elementsToHide.push({
+                    element: sidebarTOC,
+                    originalDisplay: sidebarTOC.style.display
+                });
+                sidebarTOC.style.display = 'none';
+            }
+            
+            // Hide mobile TOC button
+            const mobileTOCButton = document.querySelector('.lg\\:hidden');
+            if (mobileTOCButton && mobileTOCButton.closest('.flex.flex-wrap')) {
+                elementsToHide.push({
+                    element: mobileTOCButton,
+                    originalDisplay: mobileTOCButton.style.display
+                });
+                mobileTOCButton.style.display = 'none';
+            }
+            
+            // Hide action buttons (New Scan, Re-scan, Export) for cleaner PDF
+            const actionButtons = document.querySelectorAll('.flex.flex-wrap.items-center.gap-3 button');
+            actionButtons.forEach(btn => {
+                if (btn.textContent?.includes('New Scan') || 
+                    btn.textContent?.includes('Re-scan') || 
+                    btn.textContent?.includes('Export')) {
+                    elementsToHide.push({
+                        element: btn,
+                        originalDisplay: btn.style.display
+                    });
+                    btn.style.display = 'none';
+                }
+            });
+            
+            // Scroll to top to ensure full content is captured
+            window.scrollTo(0, 0);
+            
+            // Wait for DOM updates and scroll
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Convert HTML to canvas using html2canvas-pro (supports oklab colors)
+            const canvas = await html2canvas(mainContent, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+                windowWidth: mainContent.scrollWidth,
+                windowHeight: mainContent.scrollHeight,
+                allowTaint: false,
+                removeContainer: false
+            });
+            
+            // Calculate PDF dimensions
+            const imgWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            
+            // Create PDF
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            let position = 0;
+            
+            // Add first page
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+            
+            // Add additional pages if content is taller than one page
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+            
+            // Save PDF
+            pdf.save(filename);
+            
+            // Restore all hidden elements
+            elementsToHide.forEach(({ element, originalDisplay }) => {
+                if (element && originalDisplay !== undefined) {
+                    element.style.display = originalDisplay;
+                } else if (element) {
+                    element.style.display = '';
+                }
+            });
+            
+            console.log('PDF exported successfully:', filename);
+        } catch (error) {
+            console.error('Failed to export PDF:', error);
+            alert('Failed to export PDF. Please try again.');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -834,7 +965,7 @@ function ResultsContent() {
 
     return (
         <div className="min-h-screen py-12 px-6">
-            <div className="container max-w-7xl mx-auto">
+            <div className="container max-w-7xl mx-auto results-content-container" ref={contentRef}>
                 <div className="flex gap-12">
                     {/* Table of Contents Sidebar */}
                     <div className="hidden lg:block w-56 flex-shrink-0">
@@ -877,9 +1008,10 @@ function ResultsContent() {
                                 </Button>
                                 <Button 
                                     variant="ghost" 
-                                    onClick={() => window.print()}
+                                    onClick={handleExportToPDF}
+                                    disabled={isExporting}
                                 >
-                                    Export
+                                    {isExporting ? 'Exporting...' : 'Export to PDF'}
                                 </Button>
                             </div>
                         </div>
