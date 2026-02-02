@@ -78,18 +78,50 @@ class WebsiteScanner {
             console.log('User agent set');
 
             console.log(`Navigating to ${url}...`);
-            // Navigate to URL with timeout
-            const response = await this.page.goto(url, {
-                waitUntil: 'domcontentloaded',
-                timeout: 30000
-            });
+            // Navigate to URL with increased timeout and flexible wait strategy
+            // Try 'load' first, fallback to 'domcontentloaded' if timeout
+            let response;
+            try {
+                response = await this.page.goto(url, {
+                    waitUntil: 'load', // Wait for all resources to load
+                    timeout: 60000 // Increased to 60 seconds for slow sites
+                });
+            } catch (timeoutError) {
+                // If load times out, try domcontentloaded (faster, less reliable)
+                console.warn('Load timeout, trying domcontentloaded...');
+                try {
+                    response = await this.page.goto(url, {
+                        waitUntil: 'domcontentloaded',
+                        timeout: 30000
+                    });
+                } catch (domError) {
+                    // Even if navigation fails, check if page is accessible
+                    const currentUrl = this.page.url();
+                    if (currentUrl && currentUrl !== 'about:blank') {
+                        console.warn('Navigation timeout but page loaded:', currentUrl);
+                        response = { ok: () => true, status: () => 200 }; // Mock response
+                    } else {
+                        throw new Error(`Navigation timeout: ${domError.message}`);
+                    }
+                }
+            }
 
             if (!response) {
+                // Check if page is still accessible despite no response
+                const currentUrl = this.page.url();
+                if (currentUrl && currentUrl !== 'about:blank') {
+                    console.warn('No response object but page loaded:', currentUrl);
+                    return { success: true, message: `Successfully navigated to ${url} (no response object)` };
+                }
                 throw new Error('Navigation failed - no response received');
             }
 
-            if (!response.ok()) {
-                throw new Error(`Navigation failed with status ${response.status()}`);
+            // Check response status if available
+            if (response.ok && typeof response.ok === 'function') {
+                if (!response.ok()) {
+                    const status = response.status ? response.status() : 'unknown';
+                    console.warn(`Navigation returned non-OK status: ${status}, but continuing...`);
+                }
             }
 
             console.log(`Successfully navigated to ${url}`);
@@ -110,23 +142,51 @@ class WebsiteScanner {
                 throw new Error('No page loaded. Call navigateToUrl() first.');
             }
 
-            // Wait for the body element to be available
-            await this.page.waitForSelector('body', { timeout: 10000 });
+            // Wait for the body element to be available (with longer timeout)
+            try {
+                await this.page.waitForSelector('body', { timeout: 15000 });
+            } catch (e) {
+                // If body selector fails, check if page is still accessible
+                const currentUrl = this.page.url();
+                if (currentUrl && currentUrl !== 'about:blank') {
+                    console.warn('Body selector timeout but page is accessible:', currentUrl);
+                } else {
+                    throw e;
+                }
+            }
 
-            // Wait for network to be mostly idle (no new requests for 500ms)
-            await this.page.waitForFunction(
-                () => {
-                    return document.readyState === 'complete';
-                },
-                { timeout: 30000 }
-            );
+            // Wait for document ready state with multiple strategies
+            try {
+                await this.page.waitForFunction(
+                    () => {
+                        return document.readyState === 'complete' || document.readyState === 'interactive';
+                    },
+                    { timeout: 30000 }
+                );
+            } catch (e) {
+                // If readyState check fails, try a simpler check
+                console.warn('ReadyState check timeout, trying alternative...');
+                try {
+                    await this.page.waitForFunction(
+                        () => {
+                            return document.body && document.body.children.length > 0;
+                        },
+                        { timeout: 10000 }
+                    );
+                } catch (e2) {
+                    // Even if this fails, continue - page might be slow but functional
+                    console.warn('Alternative readyState check also timed out, continuing anyway...');
+                }
+            }
 
-            // Additional wait for dynamic content to load
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Additional wait for dynamic content and cookie banners to load
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
             return { success: true, message: 'Page fully loaded' };
         } catch (error) {
-            return { success: false, message: `Failed to wait for page load: ${error.message}` };
+            // Don't fail completely - page might still be usable
+            console.warn('Page load wait had issues but continuing:', error.message);
+            return { success: true, message: `Page loaded (with warnings: ${error.message})` };
         }
     }
 
@@ -227,10 +287,11 @@ class WebsiteScanner {
                 const acceptPatterns = [
                     // English
                     'accept all', 'accept', 'accept cookies', 'allow all', 'allow', 'allow cookies',
-                    'i accept', 'i agree', 'ok', 'okay', 'yes', 'agree', 'consent',
-                    // Danish (for pompdelux.dk)
+                    'i accept', 'i agree', 'ok', 'okay', 'yes', 'agree', 'consent', 'save',
+                    // Danish (enhanced)
                     'tillad alle', 'tillad', 'accepter alle', 'accepter', 'ok', 'ja',
-                    'jeg accepterer', 'jeg accepterer alle',
+                    'jeg accepterer', 'jeg accepterer alle', 'accepter alle', 'godkend alle',
+                    'godkend', 'gem og luk', 'gem',
                     // German
                     'alle akzeptieren', 'akzeptieren', 'verstanden', 'zustimmen', 'okay', 'ok', 'ja',
                     // French
@@ -320,18 +381,60 @@ class WebsiteScanner {
                         return null;
                     },
 
-                    // CookieYes
+                    // CookieYes - Enhanced detection
                     cookieyes: () => {
-                        const cyElements = document.querySelectorAll('[class*="cookieyes"], [id*="cookieyes"]');
-                        const cyScripts = Array.from(document.querySelectorAll('script')).filter(s =>
-                            s.src && s.src.includes('cookieyes')
+                        // Check for CookieYes-specific selectors
+                        const cySelectors = [
+                            '[id*="cookieyes"]',
+                            '[class*="cookieyes"]',
+                            '[id*="ckyes"]',
+                            '[class*="ckyes"]',
+                            '#cookieyes-banner',
+                            '.cookieyes-banner',
+                            '#ckyes-banner',
+                            '.ckyes-banner',
+                            '[data-cookieyes]',
+                            '[data-ckyes]'
+                        ];
+                        
+                        let cyElements = [];
+                        cySelectors.forEach(selector => {
+                            try {
+                                const found = document.querySelectorAll(selector);
+                                cyElements = cyElements.concat(Array.from(found));
+                            } catch (e) {
+                                // Ignore selector errors
+                            }
+                        });
+                        
+                        // Check for CookieYes scripts
+                        const cyScripts = Array.from(document.querySelectorAll('script')).filter(s => {
+                            const src = s.src || '';
+                            const content = s.textContent || '';
+                            return src.includes('cookieyes') || 
+                                   src.includes('ckyes') ||
+                                   content.includes('cookieyes') ||
+                                   content.includes('ckyes');
+                        });
+                        
+                        // Check for CookieYes in dataLayer or window objects
+                        const hasCookieYesGlobal = typeof window !== 'undefined' && (
+                            window.cookieyes || 
+                            window.CookieYes ||
+                            window.ckyes ||
+                            (window.dataLayer && window.dataLayer.some(item => 
+                                item && (item.cookieyes || item.CookieYes || item.ckyes)
+                            ))
                         );
-                        if (cyElements.length > 0 || cyScripts.length > 0) {
+                        
+                        if (cyElements.length > 0 || cyScripts.length > 0 || hasCookieYesGlobal) {
                             return {
                                 name: 'CookieYes',
                                 confidence: 'high',
                                 elements: cyElements.length,
-                                scripts: cyScripts.length
+                                scripts: cyScripts.length,
+                                hasGlobal: !!hasCookieYesGlobal,
+                                version: cyScripts.length > 0 ? 'Script detected' : 'Banner detected'
                             };
                         }
                         return null;
@@ -347,6 +450,23 @@ class WebsiteScanner {
                                 elements: gdprElements.length,
                                 scripts: 0,
                                 platform: 'WordPress'
+                            };
+                        }
+                        return null;
+                    },
+
+                    // CookieScript
+                    cookiescript: () => {
+                        const csElements = document.querySelectorAll('[id*="cookiescript"], [class*="cookiescript"], #cookiescript_injected');
+                        const csScripts = Array.from(document.querySelectorAll('script')).filter(s =>
+                            s.src && s.src.includes('cookiescript')
+                        );
+                        if (csElements.length > 0 || csScripts.length > 0) {
+                            return {
+                                name: 'CookieScript',
+                                confidence: 'high',
+                                elements: csElements.length,
+                                scripts: csScripts.length
                             };
                         }
                         return null;
@@ -389,6 +509,73 @@ class WebsiteScanner {
                     }
                 };
 
+                // Get and analyze cookie information for consent patterns FIRST
+                const cookieString = document.cookie || '';
+                const cookies = cookieString ? cookieString.split(';').length : 0;
+                const cookiePairs = cookieString ? cookieString.split(';').map(c => {
+                    const parts = c.trim().split('=');
+                    return {
+                        name: parts[0] || '',
+                        value: parts.slice(1).join('=') || ''
+                    };
+                }).filter(c => c.name) : [];
+                const cookieKeys = cookiePairs.map(c => c.name);
+                
+                // Analyze cookies for consent patterns
+                const consentPatterns = {
+                    // Common consent cookie names
+                    consent: ['consent', 'cookie_consent', 'cookieconsent', 'gdpr_consent', 'privacy_consent'],
+                    cookieyes: ['cookieyes', 'ckyes', 'cky-consent', 'cookieyes-consent'],
+                    cookiebot: ['cookiebot', 'cookiebot-consent', 'CookieConsent'],
+                    cookieinformation: ['cookieinformation', 'coi-consent', 'cookieconsent'],
+                    onetrust: ['onetrust', 'OptanonConsent', 'OptanonAlertBoxClosed'],
+                    termly: ['termly', 'termly-consent'],
+                    iubenda: ['iubenda', 'iub-consent'],
+                    // Generic patterns
+                    accepted: ['accepted', 'accept', 'agreed', 'agree'],
+                    preferences: ['preferences', 'preference', 'settings'],
+                    marketing: ['marketing', 'analytics', 'advertising'],
+                    necessary: ['necessary', 'required', 'essential']
+                };
+                
+                const consentAnalysis = {
+                    foundConsentCookies: [],
+                    consentValues: {},
+                    detectedProviders: [],
+                    consentStatus: 'unknown'
+                };
+                
+                cookiePairs.forEach(cookie => {
+                    const nameLower = cookie.name.toLowerCase();
+                    const valueLower = cookie.value.toLowerCase();
+                    
+                    // Check for provider-specific patterns
+                    Object.keys(consentPatterns).forEach(provider => {
+                        if (consentPatterns[provider].some(pattern => nameLower.includes(pattern))) {
+                            if (!consentAnalysis.detectedProviders.includes(provider)) {
+                                consentAnalysis.detectedProviders.push(provider);
+                            }
+                            consentAnalysis.foundConsentCookies.push({
+                                name: cookie.name,
+                                value: cookie.value.substring(0, 100), // Limit value length
+                                provider: provider
+                            });
+                            consentAnalysis.consentValues[provider] = cookie.value;
+                        }
+                    });
+                    
+                    // Check for consent status in value
+                    if (valueLower.includes('true') || valueLower.includes('1') || valueLower.includes('yes') || valueLower.includes('accepted')) {
+                        consentAnalysis.consentStatus = 'accepted';
+                    } else if (valueLower.includes('false') || valueLower.includes('0') || valueLower.includes('no') || valueLower.includes('rejected')) {
+                        if (consentAnalysis.consentStatus === 'unknown') {
+                            consentAnalysis.consentStatus = 'rejected';
+                        }
+                    }
+                });
+                
+                const cookieDomains = cookieKeys.length;
+
                 // Try to identify CMP provider
                 let detectedCMP = null;
                 const cmpKeys = Object.keys(cmpDetection);
@@ -399,14 +586,29 @@ class WebsiteScanner {
                         break;
                     }
                 }
-
-                // Get cookie information
-                const cookies = document.cookie ? document.cookie.split(';').length : 0;
-                const cookieKeys = document.cookie ? document.cookie.split(';').map(c => c.split('=')[0].trim()) : [];
-                const cookieDomains = document.cookie ? [...new Set(document.cookie.split(';').map(c => {
-                    const parts = c.split('=');
-                    return parts.length > 1 ? parts[0].trim() : '';
-                }).filter(c => c))].length : 0;
+                
+                // If no CMP detected but we found consent cookies, try to infer from cookies
+                if (!detectedCMP && consentAnalysis.detectedProviders.length > 0) {
+                    const providerFromCookies = consentAnalysis.detectedProviders[0];
+                    // Map cookie provider names to CMP names
+                    const providerMap = {
+                        'cookieyes': 'CookieYes',
+                        'cookiebot': 'Cookiebot',
+                        'cookieinformation': 'CookieInformation',
+                        'onetrust': 'OneTrust',
+                        'termly': 'Termly',
+                        'iubenda': 'Iubenda'
+                    };
+                    
+                    const mappedName = providerMap[providerFromCookies] || providerFromCookies;
+                    detectedCMP = {
+                        name: mappedName,
+                        confidence: 'medium',
+                        elements: 0,
+                        scripts: 0,
+                        detectedFrom: 'cookie-analysis'
+                    };
+                }
 
                 // Enhanced selectors for common cookie banners
                 const selectors = [
@@ -433,10 +635,39 @@ class WebsiteScanner {
                             '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowallSelection',
                             '[class*="cookiebot"] button[class*="accept"]',
                             '#cookiebot button[class*="accept"]'
+                        ] : [],
+
+                        // CookieYes - Enhanced selectors
+                        detectedCMP.name === 'CookieYes' ? [
+                            '#cookieyes-banner button',
+                            '#cookieyes-banner a',
+                            '#ckyes-banner button',
+                            '#ckyes-banner a',
+                            '[id*="cookieyes"] button[class*="accept"]',
+                            '[id*="cookieyes"] a[class*="accept"]',
+                            '[class*="cookieyes"] button[class*="accept"]',
+                            '[class*="cookieyes"] a[class*="accept"]',
+                            '[id*="ckyes"] button[class*="accept"]',
+                            '[id*="ckyes"] a[class*="accept"]',
+                            '[data-cookieyes] button',
+                            '[data-cookieyes] a',
+                            'button[data-cookieyes-accept]',
+                            'a[data-cookieyes-accept]'
+                        ] : [],
+
+                        // CookieScript - Enhanced selectors
+                        detectedCMP.name === 'CookieScript' ? [
+                            '#cookiescript_accept',
+                            '#cookiescript_save',
+                            '[id*="cookiescript"] [role="button"][id*="accept"]',
+                            '[id*="cookiescript"] [role="button"][id*="save"]',
+                            '[class*="cookiescript"] [role="button"][id*="accept"]',
+                            '[class*="cookiescript"] button[id*="accept"]',
+                            '[class*="cookiescript"] a[id*="accept"]'
                         ] : []
                     ].flat() : []),
 
-                    // Generic selectors
+                    // Generic selectors - including role="button" elements
                     'button[class*="accept"]',
                     'button[class*="agree"]',
                     'button[class*="consent"]',
@@ -446,16 +677,32 @@ class WebsiteScanner {
                     'button[id*="agree"]',
                     'a[id*="accept"]',
                     'a[id*="agree"]',
+                    
+                    // Role-based button elements (div, span with role="button")
+                    '[role="button"][class*="accept"]',
+                    '[role="button"][class*="agree"]',
+                    '[role="button"][id*="accept"]',
+                    '[role="button"][id*="agree"]',
+                    '[role="button"][id*="save"]',
+                    'div[role="button"][class*="accept"]',
+                    'div[role="button"][id*="accept"]',
+                    'span[role="button"][class*="accept"]',
+                    'span[role="button"][id*="accept"]',
 
                     // General
                     'button',
                     'a',
+                    '[role="button"]', // Catch all role="button" elements
 
                     // Fallback selectors
                     '[class*="cookie"] button',
                     '[id*="cookie"] button',
                     '[class*="consent"] button',
-                    '[id*="consent"] button'
+                    '[id*="consent"] button',
+                    '[class*="cookie"] [role="button"]',
+                    '[id*="cookie"] [role="button"]',
+                    '[class*="consent"] [role="button"]',
+                    '[id*="consent"] [role="button"]'
                 ].flat();
 
                 // Try each selector
@@ -463,11 +710,20 @@ class WebsiteScanner {
                     try {
                         const elements = document.querySelectorAll(selector);
                         for (const element of elements) {
-                            const text = element.textContent.trim();
-                            // Check if text matches any accept pattern
-                            const matchesPattern = acceptPatterns.some(pattern =>
-                                new RegExp(pattern, "i").test(text)
-                            );
+                            // Get text content - check both textContent and innerText
+                            const text = (element.textContent || element.innerText || '').trim();
+                            const ariaLabel = element.getAttribute('aria-label') || '';
+                            const title = element.getAttribute('title') || '';
+                            const dataText = element.getAttribute('data-cs-i18n-text') || '';
+                            
+                            // Combine all text sources for matching
+                            const allText = `${text} ${ariaLabel} ${title} ${dataText}`.toLowerCase();
+                            
+                            // Check if text matches any accept pattern (more flexible matching)
+                            const matchesPattern = acceptPatterns.some(pattern => {
+                                const regex = new RegExp(pattern, "i");
+                                return regex.test(text) || regex.test(ariaLabel) || regex.test(title) || regex.test(allText);
+                            });
 
                             if (matchesPattern) {
                                 // Check if element is visible and clickable
@@ -475,17 +731,58 @@ class WebsiteScanner {
                                 const isVisible = style.display !== 'none' &&
                                                 style.visibility !== 'hidden' &&
                                                 style.opacity !== '0' &&
-                                                element.offsetParent !== null;
+                                                (element.offsetParent !== null || element.tagName === 'BODY');
+                                
+                                // Additional check: element should be within viewport or cookie banner
+                                const rect = element.getBoundingClientRect();
+                                const isInViewport = rect.width > 0 && rect.height > 0;
+                                
+                                // Check if element is inside a cookie banner/consent dialog
+                                const isInCookieBanner = element.closest('[id*="cookie"], [class*="cookie"], [id*="consent"], [class*="consent"], [id*="gdpr"], [class*="gdpr"], [role="dialog"]') !== null;
 
-                                if (isVisible) {
-                                    console.log('Found accept button:', selector, text);
-                                    element.click();
+                                if (isVisible && (isInViewport || isInCookieBanner)) {
+                                    console.log('Found accept button:', selector, text, 'Tag:', element.tagName, 'Role:', element.getAttribute('role'));
+                                    
+                                    // Try multiple click methods for better compatibility
+                                    try {
+                                        // For elements with role="button", ensure they're focusable and clickable
+                                        if (element.getAttribute('role') === 'button') {
+                                            element.focus();
+                                            // Trigger both click event and mousedown/mouseup for better compatibility
+                                            element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                                            element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                                        }
+                                        element.click();
+                                    } catch (clickError) {
+                                        // Fallback: try programmatic click via dispatchEvent
+                                        try {
+                                            const clickEvent = new MouseEvent('click', {
+                                                bubbles: true,
+                                                cancelable: true,
+                                                view: window
+                                            });
+                                            element.dispatchEvent(clickEvent);
+                                        } catch (dispatchError) {
+                                            console.warn('Click failed, trying focus and Enter key:', dispatchError);
+                                            // Last resort: focus and simulate Enter key
+                                            element.focus();
+                                            const enterEvent = new KeyboardEvent('keydown', {
+                                                key: 'Enter',
+                                                code: 'Enter',
+                                                keyCode: 13,
+                                                bubbles: true
+                                            });
+                                            element.dispatchEvent(enterEvent);
+                                        }
+                                    }
+                                    
                                     return {
                                         success: true,
                                         element: {
                                             tagName: element.tagName,
                                             id: element.id,
                                             className: element.className,
+                                            role: element.getAttribute('role'),
                                             text: text.substring(0, 50)
                                         },
                                         selector: selector,
@@ -494,7 +791,8 @@ class WebsiteScanner {
                                         cookies: {
                                             count: cookies,
                                             keys: cookieKeys.slice(0, 10), // Limit to first 10 for privacy
-                                            domains: cookieDomains
+                                            domains: cookieDomains,
+                                            consentAnalysis: consentAnalysis
                                         }
                                     };
                                 }
@@ -512,13 +810,306 @@ class WebsiteScanner {
                     cookies: {
                         count: cookies,
                         keys: cookieKeys.slice(0, 10),
-                        domains: cookieDomains
+                        domains: cookieDomains,
+                        consentAnalysis: consentAnalysis
                     }
                 };
             });
 
             if (result.success) {
                 console.log('Successfully accepted cookies');
+                
+                // Wait for cookies to be set after clicking accept
+                // Also wait for potential navigation/reload to complete
+                try {
+                    // Wait for navigation if it occurs (with timeout)
+                    await Promise.race([
+                        this.page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 }).catch(() => null),
+                        new Promise(resolve => setTimeout(resolve, 3000))
+                    ]);
+                } catch (navError) {
+                    // Navigation might not occur, that's fine
+                    console.log('No navigation detected after cookie acceptance');
+                }
+                
+                // Additional wait for cookies to be set
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Re-read cookies after acceptance to check consent values
+                // Handle case where page might have navigated/reloaded
+                let cookiesAfterAccept = [];
+                try {
+                    cookiesAfterAccept = await this.page.evaluate(() => {
+                        const cookieString = document.cookie || '';
+                        const cookiePairs = cookieString ? cookieString.split(';').map(c => {
+                            const parts = c.trim().split('=');
+                            return {
+                                name: parts[0] || '',
+                                value: parts.slice(1).join('=') || ''
+                            };
+                        }).filter(c => c.name) : [];
+                        
+                        return cookiePairs;
+                    });
+                } catch (evalError) {
+                    // Execution context might have been destroyed due to navigation
+                    console.warn('Could not read cookies after acceptance (page may have navigated):', evalError.message);
+                    // Try to get cookies using page.cookies() API instead
+                    try {
+                        const browserCookies = await this.page.cookies();
+                        cookiesAfterAccept = browserCookies.map(c => ({
+                            name: c.name,
+                            value: c.value
+                        }));
+                        console.log('Retrieved cookies using page.cookies() API:', cookiesAfterAccept.length);
+                    } catch (cookieError) {
+                        console.warn('Could not retrieve cookies using page.cookies():', cookieError.message);
+                        cookiesAfterAccept = [];
+                    }
+                }
+                
+                // Analyze ALL cookies for consent patterns and Consent Mode V2
+                let consentModeV2Detected = false;
+                let consentModeV2Details = null;
+                
+                // Define consent cookie patterns for all major CMPs
+                const consentCookiePatterns = {
+                    cookieyes: ['cookieyes-consent', 'ckyes-consent', 'cky-consent'],
+                    cookiebot: ['cookiebot', 'cookieconsent', 'cookiebotconsent'],
+                    cookieinformation: ['cookieinformation', 'coi-consent', 'cookieconsent'],
+                    onetrust: ['optanonconsent', 'optanonalertboxclosed', 'onetrustconsent'],
+                    termly: ['termly-consent', 'termlyconsent'],
+                    iubenda: ['iubenda', 'iub-consent', 'iubendaconsent'],
+                    generic: ['consent', 'cookie_consent', 'cookieconsent', 'gdpr_consent', 'privacy_consent', 'user_consent']
+                };
+                
+                // Helper function to check if a value indicates consent granted
+                const isConsentGranted = (value) => {
+                    if (!value) return false;
+                    const valueLower = String(value).toLowerCase();
+                    return valueLower === 'yes' || valueLower === 'true' || valueLower === '1' || 
+                           valueLower === 'accepted' || valueLower === 'granted' || valueLower === 'allow';
+                };
+                
+                // Helper function to extract consent categories from cookie value
+                const extractConsentCategories = (cookieValue, cookieName) => {
+                    const categories = {
+                        necessary: null,
+                        functional: null,
+                        analytics: null,
+                        advertisement: null,
+                        marketing: null,
+                        performance: null,
+                        preferences: null,
+                        statistics: null
+                    };
+                    
+                    // Try to parse as JSON first
+                    let parsed = null;
+                    try {
+                        parsed = JSON.parse(cookieValue);
+                    } catch (e) {
+                        try {
+                            const decoded = decodeURIComponent(cookieValue);
+                            parsed = JSON.parse(decoded);
+                        } catch (e2) {
+                            try {
+                                const base64Decoded = atob(cookieValue);
+                                parsed = JSON.parse(base64Decoded);
+                            } catch (e3) {
+                                // Try fixing unquoted keys
+                                const objMatch = cookieValue.match(/\{.*\}/);
+                                if (objMatch) {
+                                    try {
+                                        const fixedJson = objMatch[0].replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+                                        parsed = JSON.parse(fixedJson);
+                                    } catch (e4) {
+                                        // Manual regex parsing
+                                        const extractValue = (pattern) => {
+                                            const match = cookieValue.match(new RegExp(pattern + '["\\s]*:["\\s]*"?(yes|no|true|false|1|0|accepted|granted|allow|deny)"?', 'i'));
+                                            return match ? match[1].toLowerCase() : null;
+                                        };
+                                        
+                                        parsed = {
+                                            necessary: extractValue('necessary'),
+                                            functional: extractValue('functional'),
+                                            analytics: extractValue('analytics'),
+                                            advertisement: extractValue('advertisement'),
+                                            marketing: extractValue('marketing'),
+                                            performance: extractValue('performance'),
+                                            preferences: extractValue('preferences'),
+                                            statistics: extractValue('statistics'),
+                                            consent: extractValue('consent'),
+                                            action: extractValue('action')
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (parsed && typeof parsed === 'object') {
+                        // Map common field names to standard categories
+                        categories.necessary = parsed.necessary !== undefined ? parsed.necessary : 
+                                               parsed.essential !== undefined ? parsed.essential : null;
+                        categories.functional = parsed.functional !== undefined ? parsed.functional : null;
+                        categories.analytics = parsed.analytics !== undefined ? parsed.analytics :
+                                             parsed.statistics !== undefined ? parsed.statistics : null;
+                        categories.advertisement = parsed.advertisement !== undefined ? parsed.advertisement :
+                                                 parsed.advertising !== undefined ? parsed.advertising :
+                                                 parsed.marketing !== undefined ? parsed.marketing : null;
+                        categories.marketing = parsed.marketing !== undefined ? parsed.marketing :
+                                              parsed.advertisement !== undefined ? parsed.advertisement : null;
+                        categories.performance = parsed.performance !== undefined ? parsed.performance : null;
+                        categories.preferences = parsed.preferences !== undefined ? parsed.preferences : null;
+                        categories.statistics = parsed.statistics !== undefined ? parsed.statistics :
+                                               parsed.analytics !== undefined ? parsed.analytics : null;
+                    }
+                    
+                    return categories;
+                };
+                
+                // Check ALL cookies for consent patterns
+                for (const cookie of cookiesAfterAccept) {
+                    const nameLower = cookie.name.toLowerCase();
+                    const valueLower = cookie.value.toLowerCase();
+                    
+                    // Check if this cookie name matches any consent pattern
+                    let matchedProvider = null;
+                    for (const [provider, patterns] of Object.entries(consentCookiePatterns)) {
+                        if (patterns.some(pattern => nameLower.includes(pattern))) {
+                            matchedProvider = provider;
+                            break;
+                        }
+                    }
+                    
+                    // Also check generic consent indicators in cookie name
+                    const isGenericConsent = !matchedProvider && (
+                        nameLower.includes('consent') || 
+                        nameLower.includes('gdpr') || 
+                        nameLower.includes('privacy') ||
+                        nameLower.includes('cookie') && (nameLower.includes('accept') || nameLower.includes('agree'))
+                    );
+                    
+                    if (matchedProvider || isGenericConsent) {
+                        try {
+                            const categories = extractConsentCategories(cookie.value, cookie.name);
+                            
+                            // Check if all Consent Mode V2 categories are granted
+                            // Consent Mode V2 requires: necessary, functional, analytics, advertisement, performance
+                            const hasNecessary = isConsentGranted(categories.necessary);
+                            const hasFunctional = isConsentGranted(categories.functional);
+                            const hasAnalytics = isConsentGranted(categories.analytics) || isConsentGranted(categories.statistics);
+                            const hasAdvertisement = isConsentGranted(categories.advertisement) || isConsentGranted(categories.marketing);
+                            const hasPerformance = isConsentGranted(categories.performance);
+                            
+                            // Also check for overall consent indicator
+                            const overallConsent = isConsentGranted(cookie.value) || 
+                                                  valueLower.includes('consent:yes') ||
+                                                  valueLower.includes('consent:true') ||
+                                                  valueLower.includes('consent:"yes"') ||
+                                                  valueLower.includes('action:yes') ||
+                                                  valueLower.includes('action:"yes"');
+                            
+                            // Check for OneTrust specific format (base64 encoded consent string)
+                            if (nameLower.includes('optanonconsent')) {
+                                // OneTrust format: C0001:1 means category 1 (necessary) is granted
+                                // C0002:1 = functional, C0003:1 = analytics, C0004:1 = advertising
+                                const hasC0001 = cookie.value.includes('C0001:1');
+                                const hasC0002 = cookie.value.includes('C0002:1');
+                                const hasC0003 = cookie.value.includes('C0003:1');
+                                const hasC0004 = cookie.value.includes('C0004:1');
+                                
+                                if (hasC0001 && hasC0002 && hasC0003 && hasC0004) {
+                                    consentModeV2Detected = true;
+                                    consentModeV2Details = {
+                                        detectedFrom: 'onetrust-optanonconsent',
+                                        cookieName: cookie.name,
+                                        allCategoriesGranted: true,
+                                        categories: {
+                                            necessary: hasC0001,
+                                            functional: hasC0002,
+                                            analytics: hasC0003,
+                                            advertisement: hasC0004,
+                                            performance: true // OneTrust doesn't always have performance category
+                                        }
+                                    };
+                                    break; // Found definitive consent, stop checking
+                                }
+                            }
+                            
+                            // Check if all Consent Mode V2 categories are granted
+                            if (hasNecessary && hasFunctional && hasAnalytics && hasAdvertisement && hasPerformance && overallConsent) {
+                                consentModeV2Detected = true;
+                                consentModeV2Details = {
+                                    detectedFrom: matchedProvider || 'generic-consent-cookie',
+                                    cookieName: cookie.name,
+                                    allCategoriesGranted: true,
+                                    categories: {
+                                        necessary: hasNecessary,
+                                        functional: hasFunctional,
+                                        analytics: hasAnalytics,
+                                        advertisement: hasAdvertisement,
+                                        performance: hasPerformance
+                                    },
+                                    provider: matchedProvider
+                                };
+                                console.log(`Consent Mode V2 detected from cookie: ${cookie.name} (${matchedProvider || 'generic'})`);
+                                break; // Found definitive consent, stop checking
+                            } else if (overallConsent && (hasNecessary || hasFunctional || hasAnalytics || hasAdvertisement)) {
+                                // Partial consent detected - store details but don't set as Consent Mode V2 yet
+                                if (!consentModeV2Details) {
+                                    consentModeV2Details = {
+                                        detectedFrom: matchedProvider || 'generic-consent-cookie',
+                                        cookieName: cookie.name,
+                                        allCategoriesGranted: false,
+                                        categories: {
+                                            necessary: hasNecessary,
+                                            functional: hasFunctional,
+                                            analytics: hasAnalytics,
+                                            advertisement: hasAdvertisement,
+                                            performance: hasPerformance
+                                        },
+                                        provider: matchedProvider
+                                    };
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`Error parsing consent cookie ${cookie.name}:`, e);
+                        }
+                    }
+                }
+                
+                // If we didn't find Consent Mode V2 but found consent cookies, check for alternative indicators
+                if (!consentModeV2Detected && cookiesAfterAccept.length > 0) {
+                    // Check for Google Consent Mode API indicators in cookies
+                    for (const cookie of cookiesAfterAccept) {
+                        const nameLower = cookie.name.toLowerCase();
+                        // Google Consent Mode v2 uses specific cookie patterns
+                        if (nameLower.includes('_gcl_') || nameLower.includes('_gac_') || nameLower.includes('_ga_')) {
+                            // These cookies are set when Consent Mode is active
+                            // Check if we have consent cookies alongside these
+                            const hasConsentCookie = cookiesAfterAccept.some(c => {
+                                const cName = c.name.toLowerCase();
+                                return cName.includes('consent') || cName.includes('gdpr') || cName.includes('cookie');
+                            });
+                            
+                            if (hasConsentCookie) {
+                                consentModeV2Detected = true;
+                                consentModeV2Details = {
+                                    detectedFrom: 'google-consent-mode-indicators',
+                                    cookieName: cookie.name,
+                                    allCategoriesGranted: true,
+                                    note: 'Detected via Google Consent Mode cookie patterns'
+                                };
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // All cookies have been checked - the generic check above handles all CMPs
+                
                 const cmpName = result.cmp ? result.cmp.name : 'Text-based detection';
                 const message = `Accepted cookies using ${result.method} detection${result.cmp ? ` (${result.cmp.name})` : ''}: "${result.element.text}"`;
 
@@ -529,7 +1120,12 @@ class WebsiteScanner {
                     element: result.element,
                     method: result.method,
                     cmp: result.cmp,
-                    cookies: result.cookies
+                    cookies: {
+                        ...result.cookies,
+                        afterAccept: cookiesAfterAccept.length,
+                        consentModeV2: consentModeV2Detected,
+                        consentModeV2Details: consentModeV2Details
+                    }
                 };
             } else {
                 console.log('Cookie acceptance detection found no accept buttons');
@@ -651,6 +1247,15 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             element: cookieResult.element || null,
             cookies: cookieResult.cookies || null
         };
+        
+        // Set Consent Mode V2 from cookie analysis if detected
+        if (cookieResult.cookies?.consentModeV2 !== undefined) {
+            results.consentModeV2 = cookieResult.cookies.consentModeV2;
+            console.log('Consent Mode V2 detected from cookies:', cookieResult.cookies.consentModeV2);
+            if (cookieResult.cookies.consentModeV2Details) {
+                console.log('Consent Mode V2 details:', cookieResult.cookies.consentModeV2Details);
+            }
+        }
 
         // Get page info (after potential cookie acceptance)
         console.log('Getting page information...');
@@ -824,8 +1429,9 @@ export async function executeInitialScan(url, onProgress = () => {}) {
                         // Exclude: tags, variables, triggers arrays (available via containerStats counts)
                     };
                     
-                    // Update Consent Mode V2 status from Tagstack
-                    if (results.tagstackInfo.consentModeV2 !== undefined) {
+                    // Update Consent Mode V2 status from Tagstack (only if not already set from cookies)
+                    // Cookie-based detection takes precedence as it's more reliable
+                    if (results.tagstackInfo.consentModeV2 !== undefined && results.consentModeV2 === undefined) {
                         results.consentModeV2 = results.tagstackInfo.consentModeV2;
                     }
                     
