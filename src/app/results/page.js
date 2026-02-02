@@ -156,52 +156,86 @@ function ResultsContent() {
             return;
         }
 
-        // Ensure we're on client side before accessing sessionStorage
+        // Ensure we're on client side before accessing localStorage
         if (typeof window === 'undefined') {
             return;
         }
 
         // Async function to load scan data
         const loadScanData = async () => {
-            // Try to get scan data from sessionStorage first (new method)
+            // Check if localStorage is available
+            if (typeof Storage === 'undefined' || typeof localStorage === 'undefined') {
+                console.error('localStorage is not available in this browser');
+                setError('localStorage is not supported in this browser. Please use a modern browser.');
+                return;
+            }
+            
+            // Try to get scan data from localStorage first (new method)
             let scanData = null;
             if (sessionId) {
                 try {
                     const storageKey = `scan_${sessionId}`;
-                    console.log('Looking for scan data in sessionStorage with key:', storageKey);
+                    console.log('Looking for scan data in localStorage with key:', storageKey);
+                    console.log('localStorage length:', localStorage.length);
+                    
+                    // List all keys for debugging
+                    const allKeys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        allKeys.push(key);
+                    }
+                    console.log('All localStorage keys:', allKeys);
+                    console.log('Keys starting with "scan_":', allKeys.filter(k => k && k.startsWith('scan_')));
                     
                     // Try immediate read first
-                    let storedData = sessionStorage.getItem(storageKey);
+                    let storedData = localStorage.getItem(storageKey);
+                    console.log('Initial read result:', storedData ? `${storedData.length} characters` : 'null');
                     
                     // If not found, wait a bit and retry (in case storage just completed)
                     if (!storedData) {
                         console.log('Data not found immediately, waiting 500ms...');
                         await new Promise(resolve => setTimeout(resolve, 500));
-                        storedData = sessionStorage.getItem(storageKey);
+                        storedData = localStorage.getItem(storageKey);
+                        console.log('After wait, read result:', storedData ? `${storedData.length} characters` : 'null');
                     }
                 
                     if (storedData) {
-                        console.log('Found data in sessionStorage, size:', storedData.length, 'characters');
+                        console.log('Found data in localStorage, size:', storedData.length, 'characters');
                         scanData = JSON.parse(storedData);
-                        console.log('✅ Loaded scan data from sessionStorage');
+                        console.log('✅ Loaded scan data from localStorage');
                         console.log('Scan data keys:', Object.keys(scanData));
                         console.log('GTM Info:', scanData.gtmInfo);
                         console.log('Tagstack Info:', scanData.tagstackInfo ? 'Present' : 'Missing');
                         console.log('Performance:', scanData.performance ? 'Present' : 'Missing');
                         console.log('Cookie Info:', scanData.cookieInfo ? 'Present' : 'Missing');
-                        // Clean up after reading
-                        sessionStorage.removeItem(storageKey);
+                        // Don't remove immediately - keep it for a while in case of page reload
+                        // Clean up old scans (older than 1 hour) instead
+                        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+                        for (let i = localStorage.length - 1; i >= 0; i--) {
+                            const key = localStorage.key(i);
+                            if (key && key.startsWith('scan_') && key !== storageKey) {
+                                try {
+                                    const timestamp = parseInt(key.split('_')[1]);
+                                    if (timestamp && timestamp < oneHourAgo) {
+                                        console.log('Cleaning up old scan data:', key);
+                                        localStorage.removeItem(key);
+                                    }
+                                } catch (e) {
+                                    // Ignore parsing errors
+                                }
+                            }
+                        }
                     } else {
-                        console.warn('No data found in sessionStorage for key:', storageKey);
-                        // List all sessionStorage keys for debugging
+                        console.warn('No data found in localStorage for key:', storageKey);
+                        // List all localStorage keys for debugging
                         const allKeys = [];
-                        for (let i = 0; i < sessionStorage.length; i++) {
-                            const key = sessionStorage.key(i);
+                        for (let i = 0; i < localStorage.length; i++) {
+                            const key = localStorage.key(i);
                             if (key && key.startsWith('scan_')) {
                                 allKeys.push(key);
                             }
                         }
-                        console.log('Available scan keys in sessionStorage:', allKeys);
+                        console.log('Available scan keys in localStorage:', allKeys);
                         
                         // Fallback: Try to find the most recent scan data if exact match not found
                         // This handles cases where sessionId might not match exactly
@@ -219,7 +253,7 @@ function ResultsContent() {
                             // Try to find a match by URL
                             for (const key of sortedKeys) {
                                 try {
-                                    const candidateData = sessionStorage.getItem(key);
+                                    const candidateData = localStorage.getItem(key);
                                     if (candidateData) {
                                         const parsed = JSON.parse(candidateData);
                                         // Check if URL matches (allowing for trailing slash differences)
@@ -228,7 +262,7 @@ function ResultsContent() {
                                         if (candidateUrl === targetUrl) {
                                             console.log(`✅ Found matching scan data in fallback key: ${key}`);
                                             scanData = parsed;
-                                            sessionStorage.removeItem(key);
+                                            localStorage.removeItem(key);
                                             foundMatch = true;
                                             break;
                                         }
@@ -243,11 +277,11 @@ function ResultsContent() {
                                 console.log('No URL match found, using most recent scan data as fallback...');
                                 try {
                                     const mostRecentKey = sortedKeys[0];
-                                    const mostRecentData = sessionStorage.getItem(mostRecentKey);
+                                    const mostRecentData = localStorage.getItem(mostRecentKey);
                                     if (mostRecentData) {
                                         scanData = JSON.parse(mostRecentData);
                                         console.log(`✅ Using most recent scan data from key: ${mostRecentKey}`);
-                                        sessionStorage.removeItem(mostRecentKey);
+                                        localStorage.removeItem(mostRecentKey);
                                     }
                                 } catch (e) {
                                     console.error('Failed to use fallback data:', e);
@@ -371,8 +405,8 @@ function ResultsContent() {
             
             // If we have sessionId but no data, show error
             if (sessionId && !scanData) {
-                console.error('Session ID provided but no data found in sessionStorage');
-                setError('Scan results not found. The scan may have expired or the session was cleared. Please try scanning again.');
+                console.error('Session ID provided but no data found in localStorage');
+                setError('Scan results not found. The scan may have expired or been cleared. Please try scanning again.');
                 return;
             }
 
@@ -491,16 +525,80 @@ function ResultsContent() {
             performanceScore = results.performance.performanceScore;
         }
 
-        // Adjust privacy score based on Consent Mode V2 and cookie handling
+        // Calculate Privacy Score from scratch - BE MORE CRITICAL
+        // Based on 2026 privacy standards (GDPR, CCPA, ePrivacy)
+        privacyScore = 0; // Start from 0
+        
+        const cookieInfo = results.cookieInfo || {};
+        const cmp = cookieInfo.cmp || {};
+        const cookies = cookieInfo.cookies || {};
+        
+        // 1. CMP Implementation Quality (30 points)
+        if (cmp.confidence === 'high') {
+            privacyScore += 30; // High-confidence CMP (CookieInformation, OneTrust, Cookiebot, etc.)
+        } else if (cmp.confidence === 'low' || cmp.name) {
+            privacyScore += 15; // Low-confidence or generic CMP
+        } else {
+            privacyScore += 0; // No CMP detected - major privacy concern
+        }
+        
+        // 2. Consent Mode V2 Implementation (25 points) - CRITICAL for privacy
         if (results.consentModeV2) {
-            privacyScore = Math.min(100, privacyScore + 10); // Bonus for Consent Mode V2
+            privacyScore += 25; // Strong bonus for Consent Mode V2
+        } else {
+            privacyScore -= 10; // Penalty for missing Consent Mode V2
         }
-        if (results.cookieInfo?.accepted) {
-            privacyScore = Math.min(100, privacyScore + 5); // Bonus for cookie acceptance
+        
+        // 3. Cookie Transparency & Disclosure (20 points)
+        if (cookies.count !== undefined && cookies.count > 0) {
+            privacyScore += 10; // Cookie count is disclosed
         }
-        if (results.cookieInfo?.cmp?.confidence === 'high') {
-            privacyScore = Math.min(100, privacyScore + 5); // Bonus for high-confidence CMP detection
+        if (cookies.keys && cookies.keys.length > 0) {
+            privacyScore += 5; // Cookie names are accessible
         }
+        if (cookies.domains && cookies.domains > 1) {
+            // Multiple domains can indicate third-party tracking
+            if (cookies.domains <= 3) {
+                privacyScore += 5; // Reasonable number of domains
+            } else {
+                privacyScore -= 5; // Too many domains (privacy concern)
+            }
+        }
+        
+        // 4. Cookie Management & User Control (15 points)
+        if (cookieInfo.accepted && cmp.name) {
+            // If CMP is detected, assume granular controls exist
+            if (cmp.confidence === 'high') {
+                privacyScore += 15; // High-confidence CMPs typically have granular controls
+            } else {
+                privacyScore += 5; // Basic controls assumed
+            }
+        } else if (cookieInfo.accepted && !cmp.name) {
+            privacyScore += 0; // No CMP means no proper controls
+        }
+        
+        // 5. Data Minimization (10 points)
+        const cookieCount = cookies.count || 0;
+        if (cookieCount === 0) {
+            privacyScore += 0; // No cookies (but also no functionality)
+        } else if (cookieCount <= 10) {
+            privacyScore += 10; // Minimal cookies (good privacy practice)
+        } else if (cookieCount <= 20) {
+            privacyScore += 5; // Reasonable amount
+        } else if (cookieCount <= 50) {
+            privacyScore += 0; // Moderate amount
+        } else {
+            privacyScore -= 10; // Excessive cookies (privacy concern)
+        }
+        
+        console.log('Calculating privacy score:', {
+            cmpConfidence: cmp.confidence,
+            cmpName: cmp.name,
+            consentModeV2: results.consentModeV2,
+            cookieCount: cookieCount,
+            cookieDomains: cookies.domains,
+            cookieAccepted: cookieInfo.accepted
+        });
 
         // Calculate tracking score - BE MORE CRITICAL
         // Start from a base score (IGNORE initial tracking score from results)
@@ -600,16 +698,86 @@ function ResultsContent() {
             trackingScore -= 5; // Penalty for missing Google Ads
         }
 
-        // Adjust compliance score based on various factors
+        // Calculate Compliance Score from scratch - BE MORE CRITICAL
+        // Based on 2026 compliance standards (GDPR, CCPA, ePrivacy Directive)
+        complianceScore = 0; // Start from 0
+        
+        const complianceCookieInfo = results.cookieInfo || {};
+        const complianceCmp = complianceCookieInfo.cmp || {};
+        const tagstackInfo = results.tagstackInfo || {};
+        
+        // 1. Legal Framework Compliance (40 points)
+        // Consent Mode V2 is a strong indicator of GDPR/ePrivacy compliance
         if (results.consentModeV2) {
-            complianceScore = Math.min(100, complianceScore + 15); // Strong bonus for Consent Mode V2
+            complianceScore += 20; // Consent Mode V2 indicates proper consent handling
+        } else {
+            complianceScore -= 15; // Missing Consent Mode V2 is a compliance risk
         }
-        if (results.tagstackInfo?.cmp !== false && results.cookieInfo?.cmp) {
-            complianceScore = Math.min(100, complianceScore + 10); // Bonus for CMP detection
+        
+        // CMP presence is required for GDPR compliance
+        if (complianceCmp.confidence === 'high') {
+            complianceScore += 20; // High-confidence CMP (proper legal framework)
+        } else if (complianceCmp.confidence === 'low' || complianceCmp.name) {
+            complianceScore += 10; // Basic CMP (partial compliance)
+        } else {
+            complianceScore -= 20; // No CMP detected - major compliance issue
         }
+        
+        // 2. Cookie Consent Quality & Implementation (30 points)
+        if (complianceCmp.confidence === 'high') {
+            complianceScore += 30; // Enterprise-grade CMP (CookieInformation, OneTrust, Cookiebot)
+        } else if (complianceCmp.confidence === 'low') {
+            complianceScore += 15; // Basic CMP implementation
+        } else if (complianceCookieInfo.accepted && !complianceCmp.name) {
+            complianceScore += 5; // Generic cookie banner (minimal compliance)
+        } else {
+            complianceScore -= 20; // No cookie consent mechanism - compliance violation
+        }
+        
+        // 3. Data Processing Transparency (20 points)
+        // Check if CMP provides proper transparency (categories, purposes, etc.)
+        if (complianceCmp.confidence === 'high') {
+            // High-confidence CMPs typically provide category-based consent
+            complianceScore += 20;
+        } else if (complianceCmp.name) {
+            // Basic CMP provides some transparency
+            complianceScore += 10;
+        } else {
+            complianceScore += 0; // No transparency mechanism
+        }
+        
+        // 4. Technical Implementation Quality (10 points)
+        // Server-side tracking with proper consent handling
         if (results.serverSideTracking) {
-            complianceScore = Math.min(100, complianceScore + 5); // Bonus for server-side tracking
+            complianceScore += 10; // Server-side tracking with consent is best practice
+        } else {
+            complianceScore += 0; // Client-side only (acceptable but not optimal)
         }
+        
+        // Additional compliance factors from Tagstack
+        if (tagstackInfo.consentModeV2 && !results.consentModeV2) {
+            // Tagstack detected Consent Mode V2 but our scan didn't - still counts
+            complianceScore += 5;
+        }
+        
+        // Check consent defaults from Tagstack
+        if (tagstackInfo.consentDefaults) {
+            const defaults = tagstackInfo.consentDefaults;
+            // If defaults are "denied", it's better for compliance (opt-in approach)
+            const deniedCount = Object.values(defaults).filter(v => v === 'denied').length;
+            if (deniedCount >= 4) {
+                complianceScore += 5; // Most consent types default to denied (good practice)
+            }
+        }
+        
+        console.log('Calculating compliance score:', {
+            consentModeV2: results.consentModeV2,
+            cmpConfidence: complianceCmp.confidence,
+            cmpName: complianceCmp.name,
+            serverSideTracking: results.serverSideTracking,
+            tagstackConsentModeV2: tagstackInfo.consentModeV2,
+            consentDefaults: tagstackInfo.consentDefaults
+        });
 
         // Clamp all scores between 0-100
         performanceScore = Math.max(0, Math.min(100, performanceScore));

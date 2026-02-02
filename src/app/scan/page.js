@@ -90,38 +90,107 @@ function ScanContent() {
                                     // Step 8: Finalizing (UI-only step)
                                     setCurrentStep(8);
 
-                                    // Store scan results in sessionStorage to avoid URL size limits
+                                    // Store scan results in localStorage to avoid URL size limits
                                     // Generate a unique session ID (without "scan_" prefix to avoid duplication)
                                     const sessionId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
                                     const storageKey = `scan_${sessionId}`;
                                     
-                                    console.log('📦 Storing scan results in sessionStorage');
+                                    console.log('📦 Storing scan results in localStorage');
                                     console.log('   SessionId:', sessionId);
                                     console.log('   Storage key:', storageKey);
                                     console.log('   Target URL:', targetUrl);
+                                    
+                                    // Check if localStorage is available
+                                    if (typeof Storage === 'undefined' || typeof localStorage === 'undefined') {
+                                        console.error('❌ localStorage is not available in this browser');
+                                        throw new Error('localStorage is not supported');
+                                    }
+                                    
+                                    // Check if localStorage is accessible (some browsers block it in private mode)
+                                    try {
+                                        const testKey = '__localStorage_test__';
+                                        localStorage.setItem(testKey, 'test');
+                                        localStorage.removeItem(testKey);
+                                    } catch (e) {
+                                        console.error('❌ localStorage is not accessible:', e);
+                                        throw new Error('localStorage is not accessible - may be blocked by browser');
+                                    }
+                                    
                                     const resultsJson = JSON.stringify(scanResults);
                                     console.log('   Scan results size:', resultsJson.length, 'characters');
                                     console.log('   GTM Info in results:', scanResults.gtmInfo ? 'Present' : 'Missing');
                                     console.log('   Tagstack Info in results:', scanResults.tagstackInfo ? 'Present' : 'Missing');
+                                    console.log('   Scan results keys:', Object.keys(scanResults));
+                                    
+                                    // Check localStorage quota (typically 5-10MB)
+                                    const estimatedSize = new Blob([resultsJson]).size;
+                                    console.log('   Estimated size:', estimatedSize, 'bytes (~', Math.round(estimatedSize / 1024), 'KB)');
                                     
                                     try {
-                                        sessionStorage.setItem(storageKey, resultsJson);
+                                        // Clear old scan data if localStorage is getting full
+                                        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+                                        const now = Date.now();
+                                        const keysToRemove = [];
+                                        for (let i = 0; i < localStorage.length; i++) {
+                                            const key = localStorage.key(i);
+                                            if (key && key.startsWith('scan_')) {
+                                                try {
+                                                    const timestamp = parseInt(key.split('_')[1]);
+                                                    if (timestamp && (now - timestamp) > maxAge) {
+                                                        keysToRemove.push(key);
+                                                    }
+                                                } catch (e) {
+                                                    // If we can't parse the timestamp, remove old keys anyway
+                                                    keysToRemove.push(key);
+                                                }
+                                            }
+                                        }
+                                        keysToRemove.forEach(key => {
+                                            console.log('   Removing old scan data:', key);
+                                            localStorage.removeItem(key);
+                                        });
                                         
-                                        // Verify it was stored
-                                        const verify = sessionStorage.getItem(storageKey);
+                                        // Try to store the data
+                                        localStorage.setItem(storageKey, resultsJson);
+                                        console.log('   ✅ localStorage.setItem() called successfully');
+                                        
+                                        // Verify it was stored immediately
+                                        const verify = localStorage.getItem(storageKey);
                                         if (verify) {
-                                            console.log('✅ Scan results stored and verified in sessionStorage');
-                                            console.log('Stored data size:', verify.length, 'characters');
+                                            console.log('✅ Scan results stored and verified in localStorage');
+                                            console.log('   Stored data size:', verify.length, 'characters');
+                                            console.log('   Storage key exists:', localStorage.getItem(storageKey) !== null);
+                                            
+                                            // Verify the data structure
+                                            try {
+                                                const parsed = JSON.parse(verify);
+                                                console.log('   ✅ Data can be parsed back:', Object.keys(parsed));
+                                            } catch (parseError) {
+                                                console.error('   ❌ Data cannot be parsed back:', parseError);
+                                            }
                                         } else {
                                             console.error('❌ Failed to verify storage - data not found after storing');
+                                            console.error('   Storage key after setItem:', localStorage.getItem(storageKey));
+                                            setError('Failed to save scan results: Data not found after storing. Please try again.');
+                                            setIsScanning(false);
+                                            return; // Stop execution
                                         }
                                     } catch (error) {
-                                        console.error('❌ Failed to store in sessionStorage:', error);
+                                        console.error('❌ Failed to store in localStorage:', error);
+                                        console.error('   Error name:', error.name);
+                                        console.error('   Error message:', error.message);
+                                        console.error('   Error stack:', error.stack);
+                                        
                                         if (error.name === 'QuotaExceededError') {
-                                            console.error('SessionStorage quota exceeded. Data too large.');
+                                            console.error('   LocalStorage quota exceeded. Data too large.');
+                                            console.error('   Try clearing old scan data or reducing data size.');
+                                            setError('Failed to save scan results: Storage quota exceeded. Please clear browser data and try again.');
+                                        } else {
+                                            setError(`Failed to save scan results: ${error.message}. Please try again.`);
                                         }
-                                        // Fallback: try to use URL parameter (may fail for large data)
-                                        console.warn('Falling back to URL parameter (may cause HTTP 431 for large data)');
+                                        
+                                        setIsScanning(false);
+                                        return; // Don't redirect if storage failed
                                     }
 
                                     // Wait a moment before redirecting to ensure storage is complete
@@ -132,16 +201,41 @@ function ScanContent() {
                                         console.log('   SessionId in URL:', sessionId);
                                         console.log('   Results URL:', resultsUrl);
                                         
-                                        // Double-check the data is still in sessionStorage before redirecting
-                                        const verifyBeforeRedirect = sessionStorage.getItem(storageKey);
+                                        // Double-check the data is still in localStorage before redirecting
+                                        const verifyBeforeRedirect = localStorage.getItem(storageKey);
                                         if (verifyBeforeRedirect) {
-                                            console.log('   ✅ Verified data still in sessionStorage before redirect');
+                                            console.log('   ✅ Verified data still in localStorage before redirect');
+                                            console.log('   Data size:', verifyBeforeRedirect.length, 'characters');
+                                            
+                                            // List all scan keys for debugging
+                                            const allScanKeys = [];
+                                            for (let i = 0; i < localStorage.length; i++) {
+                                                const key = localStorage.key(i);
+                                                if (key && key.startsWith('scan_')) {
+                                                    allScanKeys.push(key);
+                                                }
+                                            }
+                                            console.log('   All scan keys in localStorage:', allScanKeys);
                                         } else {
-                                            console.error('   ❌ WARNING: Data NOT found in sessionStorage before redirect!');
+                                            console.error('   ❌ WARNING: Data NOT found in localStorage before redirect!');
+                                            console.error('   Storage key:', storageKey);
+                                            console.error('   localStorage length:', localStorage.length);
+                                            
+                                            // List all keys for debugging
+                                            const allKeys = [];
+                                            for (let i = 0; i < localStorage.length; i++) {
+                                                allKeys.push(localStorage.key(i));
+                                            }
+                                            console.error('   All localStorage keys:', allKeys);
+                                            
+                                            // Don't redirect if data is missing
+                                            setError('Failed to save scan results. Please try again.');
+                                            setIsScanning(false);
+                                            return;
                                         }
                                         
                                         router.push(resultsUrl);
-                                    }, 1000); // Increased delay to ensure storage completes
+                                    }, 500); // Reduced delay since localStorage is synchronous
                                 } else {
                                     throw new Error(data.error || 'Scanning failed');
                                 }
