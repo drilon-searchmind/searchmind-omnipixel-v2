@@ -2,6 +2,6 @@
   - E.g. https://expromo.com/, they have consent mode v2, but our application cannot read the cookies.
   - They use CookieYes (a different platform), we need to scrape all cookies, and look for patterns too, so that not only we check for CookieYes, but any CMP that enables cookies, so we can find them dynamically:
     - For example, look for the different consent names and their respective values.
-
+  - Also test: http://kalundborg-skov-park-have.dk for consent/cookies.
 - Change the main dark blue color to a different color.
 - Scan the websites for Meta pixel, Google Ads, Tik Tok etc. correctly.
