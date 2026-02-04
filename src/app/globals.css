@@ -94,3 +94,12 @@ body {
 .animate-fade-in-left {
 	animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards
 }
+
+@keyframes blink {
+	0%, 50% {
+		opacity: 1;
+	}
+	51%, 100% {
+		opacity: 0;
+	}
+}

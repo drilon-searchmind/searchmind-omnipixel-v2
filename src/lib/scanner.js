@@ -1313,6 +1313,13 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             result: initResult
         });
         console.log('Step 1 completed successfully');
+        // Send intermediate data
+        if (typeof onProgress === 'function') {
+            onProgress(1, 'Scanner initialized successfully', { 
+                scannerInitialized: true,
+                platform: process.platform 
+            });
+        }
 
         // Step 2: Navigate to URL
         console.log('Executing step 2: Navigate to URL');
@@ -1329,6 +1336,13 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             result: navResult
         });
         console.log('Step 2 completed successfully');
+        // Send intermediate data
+        if (typeof onProgress === 'function') {
+            onProgress(2, 'Navigation completed', { 
+                navigationSuccess: navResult.success,
+                url: url 
+            });
+        }
 
         // Step 3: Wait for Page Load
         console.log('Executing step 3: Wait for page load');
@@ -1345,6 +1359,12 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             result: loadResult
         });
         console.log('Step 3 completed successfully');
+        // Send intermediate data
+        if (typeof onProgress === 'function') {
+            onProgress(3, 'Page load completed', { 
+                pageLoadSuccess: loadResult.success 
+            });
+        }
 
         // Step 4: Accept Cookies
         console.log('Executing step 4: Accept cookies');
@@ -1385,6 +1405,14 @@ export async function executeInitialScan(url, onProgress = () => {}) {
         if (pageInfo.success) {
             results.pageInfo = pageInfo.data;
             console.log('Page info retrieved:', results.pageInfo);
+            // Send intermediate data for step 4 (cookies) and also update pageInfo for steps 2-3
+            if (typeof onProgress === 'function') {
+                onProgress(4, 'Cookies accepted', { 
+                    pageInfo: results.pageInfo, 
+                    cookieInfo: results.cookieInfo,
+                    pageLoadSuccess: true // Page info retrieved means page loaded successfully
+                });
+            }
         } else {
             console.warn('Failed to get page info:', pageInfo.message);
         }
@@ -1398,6 +1426,10 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             if (pageSpeedResult.success) {
                 results.performance = pageSpeedResult.data;
                 console.log('PageSpeed Insights retrieved:', results.performance);
+                // Send intermediate data
+                if (typeof onProgress === 'function') {
+                    onProgress(5, 'Performance metrics retrieved', { performance: results.performance });
+                }
             } else {
                 console.warn('Failed to get PageSpeed Insights:', pageSpeedResult.message);
             }
@@ -1476,6 +1508,10 @@ export async function executeInitialScan(url, onProgress = () => {}) {
 
             if (gtmResult.found) {
                 console.log(`✅ GTM containers found: ${gtmResult.containers.join(', ')}`);
+                // Send intermediate data
+                if (typeof onProgress === 'function') {
+                    onProgress(6, 'GTM containers found', { gtmInfo: results.gtmInfo });
+                }
             } else {
                 console.log('❌ No GTM containers found');
                 console.log('Debug: Checking HTML for GTM patterns...');
@@ -1762,6 +1798,10 @@ export async function executeInitialScan(url, onProgress = () => {}) {
                 linkedin: results.pixelInfo.linkedin.found ? results.pixelInfo.linkedin.pixelIds : 'Not found',
                 googleAds: results.pixelInfo.googleAds.found ? results.pixelInfo.googleAds.conversionIds : 'Not found'
             });
+            // Send intermediate data
+            if (typeof onProgress === 'function') {
+                onProgress(8, 'Pixel scanning completed', { pixelInfo: results.pixelInfo });
+            }
         } catch (error) {
             console.error('Pixel scanning error:', error);
             results.pixelInfo = {

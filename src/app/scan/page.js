@@ -3,6 +3,8 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import ScannerBox from "@/components/scan/scanner-box";
+import ScanInfoBox from "@/components/scan/scan-info-box";
 
 const SCAN_STEPS = [
     { id: 1, title: "Initializing Scanner", description: "Setting up scanning environment" },
@@ -24,6 +26,8 @@ function ScanContent() {
     const [currentStep, setCurrentStep] = useState(0);
     const [isScanning, setIsScanning] = useState(true);
     const [error, setError] = useState(null);
+    const [statusMessages, setStatusMessages] = useState([]);
+    const [scanData, setScanData] = useState({});
 
     useEffect(() => {
         if (!url) {
@@ -81,12 +85,31 @@ function ScanContent() {
                                 // Update UI step based on progress
                                 setCurrentStep(data.step);
                                 console.log(`Step ${data.step}: ${data.message}`);
+                                
+                                // Add message to status messages for scanner box
+                                setStatusMessages(prev => [
+                                    ...prev,
+                                    {
+                                        type: 'info',
+                                        text: data.message || `Executing step ${data.step}...`,
+                                        timestamp: Date.now(),
+                                        id: `progress-${Date.now()}-${Math.random()}`
+                                    }
+                                ]);
+                                
+                                // Update scan data incrementally if available
+                                if (data.data) {
+                                    setScanData(prev => ({ ...prev, ...data.data }));
+                                }
                             } else if (data.type === 'error') {
                                 throw new Error(data.message);
                             } else if (data.type === 'complete') {
                                 if (data.success) {
                                     scanResults = data.data;
                                     console.log('Scan completed successfully:', scanResults);
+                                    
+                                    // Update scan data for info box
+                                    setScanData(scanResults);
 
                                     // Step 8: Finalizing (UI-only step)
                                     setCurrentStep(8);
@@ -236,7 +259,7 @@ function ScanContent() {
                                         }
                                         
                                         router.push(resultsUrl);
-                                    }, 500); // Reduced delay since localStorage is synchronous
+                                    }, 1000); // Wait 1 second before redirecting
                                 } else {
                                     throw new Error(data.error || 'Scanning failed');
                                 }
@@ -299,6 +322,18 @@ function ScanContent() {
                             <p className="text-sm text-foreground/50">
                                 Please wait while we scan the website...
                             </p>
+
+                            <div className="space-y-4">
+                                <ScannerBox 
+                                    currentStep={currentStep} 
+                                    statusMessages={statusMessages}
+                                    isScanning={isScanning}
+                                />
+                                <ScanInfoBox 
+                                    currentStep={currentStep}
+                                    scanData={scanData}
+                                />
+                            </div>
                         </div>
                     )}
                 </span>

@@ -51,8 +51,13 @@ export async function POST(request) {
             const encoder = new TextEncoder();
             const stream = new ReadableStream({
                 async start(controller) {
-                    const sendProgress = (step, message) => {
-                        const data = JSON.stringify({ type: 'progress', step, message });
+                    const sendProgress = (step, message, intermediateData = null) => {
+                        const data = JSON.stringify({ 
+                            type: 'progress', 
+                            step, 
+                            message,
+                            data: intermediateData 
+                        });
                         controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                     };
 
