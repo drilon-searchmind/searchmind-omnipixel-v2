@@ -71,6 +71,6 @@ RUN ln -s /usr/lib/chromium/chromium-sandbox /usr/bin/chromium-sandbox
 EXPOSE 3000
 
 # Start the application
-# Next.js needs to listen on 0.0.0.0 to accept external connections in Docker/Railway
-# Use Railway's PORT environment variable if provided, otherwise default to 3000
-CMD ["sh", "-c", "next start -H 0.0.0.0 -p ${PORT:-3000}"]
+# Use the full path to next binary and make it listen on 0.0.0.0
+# Railway will set PORT environment variable, default to 3000 if not set
+CMD ["sh", "-c", "./node_modules/.bin/next start -H 0.0.0.0 -p ${PORT:-3000}"]
