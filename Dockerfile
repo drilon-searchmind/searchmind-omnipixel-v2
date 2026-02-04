@@ -48,14 +48,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including devDependencies needed for build)
+RUN npm ci
 
 # Copy application files
 COPY . .
 
 # Build Next.js app
 RUN npm run build
+
+# Prune devDependencies after build to reduce image size (optional)
+RUN npm prune --production
 
 # Set Chromium path for Puppeteer
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
