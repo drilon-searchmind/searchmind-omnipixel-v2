@@ -70,8 +70,10 @@ export function MarketingScripts({ results }) {
                                                         : `Pixels: ${data.pixelIds.join(', ')}`
                                                     }
                                                 </div>
-                                            ) : data.pixelId && (
+                                            ) : data.pixelId ? (
                                                 <div>Pixel: {data.pixelId}</div>
+                                            ) : data.detectedViaGTM && (
+                                                <div className="text-orange-500">Detected via GTM (no pixel ID found)</div>
                                             )}
                                             {data.conversionIds && data.conversionIds.length > 0 ? (
                                                 <div>
@@ -99,6 +101,12 @@ export function MarketingScripts({ results }) {
                             <div className="space-y-1 text-xs text-foreground/50 pt-3 border-t border-border/40">
                                 {data.version && <div>Version: {data.version}</div>}
                                 {data.lastUpdated && <div>Last Updated: {data.lastUpdated}</div>}
+                                {data.detectedViaGTM && !data.pixelId && (
+                                    <div className="text-orange-500">⚠️ Detected via GTM (no pixel ID found)</div>
+                                )}
+                                {data.gtmTagNames && data.gtmTagNames.length > 0 && (
+                                    <div>GTM Tags: {data.gtmTagNames.join(', ')}</div>
+                                )}
                                 {data.enhancedEcommerce && <div>✓ Enhanced E-commerce</div>}
                                 {data.conversionsApi && <div>✓ Conversions API</div>}
                                 {data.remarketing && <div>✓ Remarketing</div>}

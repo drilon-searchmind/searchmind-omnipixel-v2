@@ -891,6 +891,35 @@ class WebsiteScanner {
                            valueLower === 'accepted' || valueLower === 'granted' || valueLower === 'allow';
                 };
                 
+                // Helper function to check for Google Consent Mode V2 properties
+                const hasGoogleConsentModeV2Properties = (parsed) => {
+                    if (!parsed || typeof parsed !== 'object') {
+                        return false;
+                    }
+                    
+                    // Check for googleconsentmap object (CookieScript format)
+                    if (parsed.googleconsentmap && typeof parsed.googleconsentmap === 'object') {
+                        const gcm = parsed.googleconsentmap;
+                        // Google Consent Mode V2 requires these properties to exist
+                        const requiredProps = ['ad_storage', 'analytics_storage', 'functionality_storage', 'security_storage'];
+                        const hasAllRequired = requiredProps.every(prop => gcm.hasOwnProperty(prop));
+                        if (hasAllRequired) {
+                            console.log(`    Found googleconsentmap with all required properties:`, requiredProps);
+                        }
+                        return hasAllRequired;
+                    }
+                    
+                    // Check for direct Google Consent Mode properties (at root level)
+                    const directProps = ['ad_storage', 'analytics_storage', 'functionality_storage', 'security_storage'];
+                    const hasDirectProps = directProps.some(prop => parsed.hasOwnProperty(prop));
+                    
+                    if (hasDirectProps) {
+                        console.log(`    Found direct Google Consent Mode properties:`, directProps.filter(prop => parsed.hasOwnProperty(prop)));
+                    }
+                    
+                    return hasDirectProps;
+                };
+                
                 // Helper function to extract consent categories from cookie value
                 const extractConsentCategories = (cookieValue, cookieName) => {
                     const categories = {
@@ -901,7 +930,8 @@ class WebsiteScanner {
                         marketing: null,
                         performance: null,
                         preferences: null,
-                        statistics: null
+                        statistics: null,
+                        hasGoogleConsentModeV2: false
                     };
                     
                     // Try to parse as JSON first
@@ -949,7 +979,40 @@ class WebsiteScanner {
                     }
                     
                     if (parsed && typeof parsed === 'object') {
-                        // Map common field names to standard categories
+                        // Check for Google Consent Mode V2 properties first
+                        categories.hasGoogleConsentModeV2 = hasGoogleConsentModeV2Properties(parsed);
+                        
+                        // If Google Consent Mode V2 properties exist, extract them
+                        if (categories.hasGoogleConsentModeV2) {
+                            if (parsed.googleconsentmap && typeof parsed.googleconsentmap === 'object') {
+                                const gcm = parsed.googleconsentmap;
+                                // Map Google Consent Mode properties to standard categories
+                                categories.security_storage = gcm.security_storage; // Maps to necessary
+                                categories.functionality_storage = gcm.functionality_storage; // Maps to functional
+                                categories.analytics_storage = gcm.analytics_storage; // Maps to analytics/performance
+                                categories.ad_storage = gcm.ad_storage; // Maps to advertisement
+                                categories.ad_personalization = gcm.ad_personalization; // Maps to advertisement
+                                categories.ad_user_data = gcm.ad_user_data; // Maps to advertisement
+                                categories.personalization_storage = gcm.personalization_storage; // Maps to functional
+                                console.log(`    Extracted Google Consent Mode map:`, {
+                                    security_storage: categories.security_storage,
+                                    functionality_storage: categories.functionality_storage,
+                                    analytics_storage: categories.analytics_storage,
+                                    ad_storage: categories.ad_storage
+                                });
+                            } else {
+                                // Direct properties
+                                categories.security_storage = parsed.security_storage;
+                                categories.functionality_storage = parsed.functionality_storage;
+                                categories.analytics_storage = parsed.analytics_storage;
+                                categories.ad_storage = parsed.ad_storage;
+                                categories.ad_personalization = parsed.ad_personalization;
+                                categories.ad_user_data = parsed.ad_user_data;
+                                categories.personalization_storage = parsed.personalization_storage;
+                            }
+                        }
+                        
+                        // Map common field names to standard categories (for non-Google Consent Mode cookies)
                         categories.necessary = parsed.necessary !== undefined ? parsed.necessary : 
                                                parsed.essential !== undefined ? parsed.essential : null;
                         categories.functional = parsed.functional !== undefined ? parsed.functional : null;
@@ -969,33 +1032,116 @@ class WebsiteScanner {
                     return categories;
                 };
                 
-                // Check ALL cookies for consent patterns
+                // Check ALL cookies for Google Consent Mode V2 properties FIRST (highest priority)
+                // This doesn't require the cookie name to match consent patterns
+                console.log(`Checking ${cookiesAfterAccept.length} cookies for Google Consent Mode V2 properties...`);
                 for (const cookie of cookiesAfterAccept) {
                     const nameLower = cookie.name.toLowerCase();
-                    const valueLower = cookie.value.toLowerCase();
+                    console.log(`  Checking cookie: ${cookie.name} (value length: ${cookie.value.length})`);
                     
-                    // Check if this cookie name matches any consent pattern
-                    let matchedProvider = null;
-                    for (const [provider, patterns] of Object.entries(consentCookiePatterns)) {
-                        if (patterns.some(pattern => nameLower.includes(pattern))) {
-                            matchedProvider = provider;
-                            break;
+                    try {
+                        const categories = extractConsentCategories(cookie.value, cookie.name);
+                        console.log(`    Has Google Consent Mode V2: ${categories.hasGoogleConsentModeV2}`);
+                        
+                        // PRIORITY 1: Check for Google Consent Mode V2 properties (presence indicates Consent Mode V2)
+                        if (categories.hasGoogleConsentModeV2) {
+                            // If Google Consent Mode V2 properties exist, Consent Mode V2 is enabled
+                            // The presence of these properties indicates Consent Mode V2 configuration
+                            consentModeV2Detected = true;
+                            consentModeV2Details = {
+                                detectedFrom: 'google-consent-mode-properties',
+                                cookieName: cookie.name,
+                                allCategoriesGranted: true,
+                                detectionMethod: 'google-consent-mode-properties',
+                                googleConsentModeMap: categories.security_storage !== undefined ? {
+                                    security_storage: categories.security_storage,
+                                    functionality_storage: categories.functionality_storage,
+                                    analytics_storage: categories.analytics_storage,
+                                    ad_storage: categories.ad_storage,
+                                    ad_personalization: categories.ad_personalization,
+                                    ad_user_data: categories.ad_user_data,
+                                    personalization_storage: categories.personalization_storage
+                                } : null,
+                                categories: {
+                                    necessary: categories.security_storage !== undefined,
+                                    functional: categories.functionality_storage !== undefined,
+                                    analytics: categories.analytics_storage !== undefined,
+                                    advertisement: categories.ad_storage !== undefined,
+                                    performance: categories.analytics_storage !== undefined // analytics_storage covers performance
+                                },
+                                provider: null
+                            };
+                            console.log(`✅ Consent Mode V2 detected via Google Consent Mode properties in cookie: ${cookie.name}`);
+                            console.log(`   Google Consent Mode Map:`, consentModeV2Details.googleConsentModeMap);
+                            break; // Found definitive Consent Mode V2, stop checking
                         }
+                    } catch (e) {
+                        // Continue to other checks
+                        console.warn(`    Error checking cookie ${cookie.name} for Google Consent Mode:`, e.message);
                     }
+                }
+                
+                // If Consent Mode V2 already detected, skip remaining checks
+                if (consentModeV2Detected) {
+                    console.log('Consent Mode V2 detected via Google Consent Mode properties, skipping other detection methods');
+                } else {
+                    console.log('No Google Consent Mode V2 properties found, checking other consent patterns...');
                     
-                    // Also check generic consent indicators in cookie name
-                    const isGenericConsent = !matchedProvider && (
-                        nameLower.includes('consent') || 
-                        nameLower.includes('gdpr') || 
-                        nameLower.includes('privacy') ||
-                        nameLower.includes('cookie') && (nameLower.includes('accept') || nameLower.includes('agree'))
-                    );
-                    
-                    if (matchedProvider || isGenericConsent) {
-                        try {
-                            const categories = extractConsentCategories(cookie.value, cookie.name);
+                    // Check ALL cookies for consent patterns (for other detection methods)
+                    for (const cookie of cookiesAfterAccept) {
+                        const nameLower = cookie.name.toLowerCase();
+                        const valueLower = cookie.value.toLowerCase();
+                        
+                        // SECOND: Check if this cookie name matches any consent pattern
+                        let matchedProvider = null;
+                        for (const [provider, patterns] of Object.entries(consentCookiePatterns)) {
+                            if (patterns.some(pattern => nameLower.includes(pattern))) {
+                                matchedProvider = provider;
+                                break;
+                            }
+                        }
+                        
+                        // Also check generic consent indicators in cookie name
+                        const isGenericConsent = !matchedProvider && (
+                            nameLower.includes('consent') || 
+                            nameLower.includes('gdpr') || 
+                            nameLower.includes('privacy') ||
+                            (nameLower.includes('cookie') && (nameLower.includes('accept') || nameLower.includes('agree')))
+                        );
+                        
+                        if (matchedProvider || isGenericConsent) {
+                            try {
+                                const categories = extractConsentCategories(cookie.value, cookie.name);
+                                
+                                // PRIORITY 2: Check for OneTrust specific format (base64 encoded consent string)
+                            if (nameLower.includes('optanonconsent')) {
+                                // OneTrust format: C0001:1 means category 1 (necessary) is granted
+                                // C0002:1 = functional, C0003:1 = analytics, C0004:1 = advertising
+                                const hasC0001 = cookie.value.includes('C0001:1');
+                                const hasC0002 = cookie.value.includes('C0002:1');
+                                const hasC0003 = cookie.value.includes('C0003:1');
+                                const hasC0004 = cookie.value.includes('C0004:1');
+                                
+                                if (hasC0001 && hasC0002 && hasC0003 && hasC0004) {
+                                    consentModeV2Detected = true;
+                                    consentModeV2Details = {
+                                        detectedFrom: 'onetrust-optanonconsent',
+                                        cookieName: cookie.name,
+                                        allCategoriesGranted: true,
+                                        detectionMethod: 'onetrust-category-flags',
+                                        categories: {
+                                            necessary: hasC0001,
+                                            functional: hasC0002,
+                                            analytics: hasC0003,
+                                            advertisement: hasC0004,
+                                            performance: true // OneTrust doesn't always have performance category
+                                        }
+                                    };
+                                    break; // Found definitive consent, stop checking
+                                }
+                            }
                             
-                            // Check if all Consent Mode V2 categories are granted
+                            // PRIORITY 3: Check if all Consent Mode V2 categories are granted (value-based check)
                             // Consent Mode V2 requires: necessary, functional, analytics, advertisement, performance
                             const hasNecessary = isConsentGranted(categories.necessary);
                             const hasFunctional = isConsentGranted(categories.functional);
@@ -1011,33 +1157,6 @@ class WebsiteScanner {
                                                   valueLower.includes('action:yes') ||
                                                   valueLower.includes('action:"yes"');
                             
-                            // Check for OneTrust specific format (base64 encoded consent string)
-                            if (nameLower.includes('optanonconsent')) {
-                                // OneTrust format: C0001:1 means category 1 (necessary) is granted
-                                // C0002:1 = functional, C0003:1 = analytics, C0004:1 = advertising
-                                const hasC0001 = cookie.value.includes('C0001:1');
-                                const hasC0002 = cookie.value.includes('C0002:1');
-                                const hasC0003 = cookie.value.includes('C0003:1');
-                                const hasC0004 = cookie.value.includes('C0004:1');
-                                
-                                if (hasC0001 && hasC0002 && hasC0003 && hasC0004) {
-                                    consentModeV2Detected = true;
-                                    consentModeV2Details = {
-                                        detectedFrom: 'onetrust-optanonconsent',
-                                        cookieName: cookie.name,
-                                        allCategoriesGranted: true,
-                                        categories: {
-                                            necessary: hasC0001,
-                                            functional: hasC0002,
-                                            analytics: hasC0003,
-                                            advertisement: hasC0004,
-                                            performance: true // OneTrust doesn't always have performance category
-                                        }
-                                    };
-                                    break; // Found definitive consent, stop checking
-                                }
-                            }
-                            
                             // Check if all Consent Mode V2 categories are granted
                             if (hasNecessary && hasFunctional && hasAnalytics && hasAdvertisement && hasPerformance && overallConsent) {
                                 consentModeV2Detected = true;
@@ -1045,6 +1164,7 @@ class WebsiteScanner {
                                     detectedFrom: matchedProvider || 'generic-consent-cookie',
                                     cookieName: cookie.name,
                                     allCategoriesGranted: true,
+                                    detectionMethod: 'category-values-check',
                                     categories: {
                                         necessary: hasNecessary,
                                         functional: hasFunctional,
@@ -1054,7 +1174,7 @@ class WebsiteScanner {
                                     },
                                     provider: matchedProvider
                                 };
-                                console.log(`Consent Mode V2 detected from cookie: ${cookie.name} (${matchedProvider || 'generic'})`);
+                                console.log(`Consent Mode V2 detected from cookie values: ${cookie.name} (${matchedProvider || 'generic'})`);
                                 break; // Found definitive consent, stop checking
                             } else if (overallConsent && (hasNecessary || hasFunctional || hasAnalytics || hasAdvertisement)) {
                                 // Partial consent detected - store details but don't set as Consent Mode V2 yet
@@ -1063,6 +1183,7 @@ class WebsiteScanner {
                                         detectedFrom: matchedProvider || 'generic-consent-cookie',
                                         cookieName: cookie.name,
                                         allCategoriesGranted: false,
+                                        detectionMethod: 'partial-category-values',
                                         categories: {
                                             necessary: hasNecessary,
                                             functional: hasFunctional,
@@ -1078,6 +1199,7 @@ class WebsiteScanner {
                             console.warn(`Error parsing consent cookie ${cookie.name}:`, e);
                         }
                     }
+                }
                 }
                 
                 // If we didn't find Consent Mode V2 but found consent cookies, check for alternative indicators
@@ -1329,16 +1451,22 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             const { scanForGTM } = await import('@/lib/gtm-scanner');
             console.log('GTM scanner module imported successfully');
             
+            // Create pageEvaluate function for browser context checks
+            const pageEvaluate = async (fn) => {
+                if (!scanner.page) {
+                    throw new Error('No page available for browser context checks');
+                }
+                return await scanner.page.evaluate(fn);
+            };
+            
             console.log('Starting GTM scan with:');
             console.log('  - HTML length:', htmlContent.length);
             console.log('  - URL:', url);
             console.log('  - fetchScript function:', typeof fetchScript);
+            console.log('  - pageEvaluate function:', typeof pageEvaluate);
             
-            const gtmResult = await scanForGTM(htmlContent, url, fetchScript);
+            const gtmResult = await scanForGTM(htmlContent, url, fetchScript, pageEvaluate);
             console.log('GTM scan result:', JSON.stringify(gtmResult, null, 2));
-
-            // REMOVED: checkGTMInBrowser() method doesn't exist
-            // Will add it back later if needed
 
             results.gtmInfo = {
                 found: gtmResult.found,
@@ -1406,9 +1534,11 @@ export async function executeInitialScan(url, onProgress = () => {}) {
                             entityType: c.entityType,
                             cmp: c.cmp,
                             consentMode: c.consentMode,
-                            consentDefault: c.consentDefault
+                            consentDefault: c.consentDefault,
+                            ga4ServerSide: c.ga4ServerSide // Keep server-side tracking indicator
                             // Exclude: tags, variables, triggers arrays (too large)
                         })),
+                        serverSideTracking: processedData.serverSideTracking,
                         ga4Streams: processedData.ga4Streams.map(s => ({
                             id: s.id,
                             entityType: s.entityType,
@@ -1424,10 +1554,47 @@ export async function executeInitialScan(url, onProgress = () => {}) {
                         consentModeV2: processedData.consentModeV2,
                         cmp: processedData.cmp,
                         consentDefaults: processedData.consentDefaults,
+                        serverSideTracking: processedData.serverSideTracking,
                         detectedIds: processedData.detectedIds,
-                        containerStats: processedData.containerStats
-                        // Exclude: tags, variables, triggers arrays (available via containerStats counts)
+                        containerStats: processedData.containerStats,
+                        tags: processedData.tags // Keep tags for Facebook/Meta detection
+                        // Exclude: variables, triggers arrays (available via containerStats counts)
                     };
+                    
+                    // Update server-side tracking status from Tagstack
+                    if (processedData.serverSideTracking) {
+                        results.serverSideTracking = true;
+                        console.log('✅ Server-side tracking detected via Tagstack');
+                        console.log('   Server-side tracking details:', {
+                            fromTagstack: processedData.serverSideTracking,
+                            gtmContainers: processedData.gtmContainers.filter(c => c.ga4ServerSide).map(c => ({
+                                id: c.id,
+                                ga4ServerSide: c.ga4ServerSide
+                            })),
+                            ga4Streams: processedData.ga4Streams.filter(s => s.ga4ServerSide).map(s => ({
+                                id: s.id,
+                                ga4ServerSide: s.ga4ServerSide
+                            }))
+                        });
+                    } else {
+                        console.log('❌ Server-side tracking NOT detected in Tagstack data');
+                        console.log('   Debug info:', {
+                            gtmContainersCount: processedData.gtmContainers.length,
+                            ga4StreamsCount: processedData.ga4Streams.length,
+                            gtmContainers: processedData.gtmContainers.map(c => ({
+                                id: c.id,
+                                ga4ServerSide: c.ga4ServerSide,
+                                serverContainerUrl: c.serverContainerUrl,
+                                serverContainerName: c.serverContainerName
+                            })),
+                            ga4Streams: processedData.ga4Streams.map(s => ({
+                                id: s.id,
+                                ga4ServerSide: s.ga4ServerSide,
+                                measurementProtocolSecret: !!s.measurementProtocolSecret,
+                                serverContainerUrl: s.serverContainerUrl
+                            }))
+                        });
+                    }
                     
                     // Update Consent Mode V2 status from Tagstack (only if not already set from cookies)
                     // Cookie-based detection takes precedence as it's more reliable
@@ -1444,6 +1611,7 @@ export async function executeInitialScan(url, onProgress = () => {}) {
                     
                     console.log('Tagstack analysis completed:', {
                         gtmContainers: results.tagstackInfo.gtmContainers.length,
+                        serverSideTracking: results.tagstackInfo.serverSideTracking,
                         ga4Streams: results.tagstackInfo.ga4Streams.length,
                         consentModeV2: results.tagstackInfo.consentModeV2,
                         detectedIds: results.tagstackInfo.detectedIds
@@ -1465,6 +1633,149 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             id: 7,
             status: 'completed',
             result: { success: true, message: 'Tagstack analysis completed' }
+        });
+
+        // Step 8: Scan for Marketing Pixels
+        console.log('Executing step 8: Scan for marketing pixels');
+        onProgress(8, 'Scanning for Meta Pixel, TikTok, LinkedIn, and Google Ads...');
+        try {
+            // Get HTML content for pixel scanning
+            const htmlResult = await scanner.getPageHTML();
+            const htmlContent = htmlResult.success ? htmlResult.data : (results.pageInfo?.html || '');
+            
+            // Create pageEvaluate function for network monitoring
+            const pageEvaluate = async (fn) => {
+                if (!scanner.page) {
+                    throw new Error('No page available for pixel detection');
+                }
+                return await scanner.page.evaluate(fn);
+            };
+
+            console.log('Importing pixel scanner module...');
+            const { scanForPixels } = await import('@/lib/pixel-scanner');
+            console.log('Pixel scanner module imported successfully');
+            
+            const pixelResult = await scanForPixels(htmlContent, url, pageEvaluate);
+            console.log('Pixel scan result:', JSON.stringify(pixelResult, null, 2));
+
+            // Store pixel detection results
+            results.pixelInfo = pixelResult;
+
+            // Merge with Tagstack data if available (combine both sources)
+            if (results.tagstackInfo?.detectedIds) {
+                const tagstackIds = results.tagstackInfo.detectedIds;
+                
+                // Meta Pixel: Combine Tagstack and direct detection
+                if (tagstackIds.facebookPixel && tagstackIds.facebookPixel.length > 0) {
+                    tagstackIds.facebookPixel.forEach(id => {
+                        if (!results.pixelInfo.meta.pixelIds.includes(id)) {
+                            results.pixelInfo.meta.pixelIds.push(id);
+                        }
+                    });
+                    results.pixelInfo.meta.found = true;
+                    results.pixelInfo.meta.methods.push('tagstack-detection');
+                    // Use Tagstack ID as primary if available and no direct detection
+                    if (!results.pixelInfo.meta.pixelId) {
+                        results.pixelInfo.meta.pixelId = tagstackIds.facebookPixel[0];
+                    }
+                }
+                
+                // Check for Facebook/Meta tags in GTM even if no pixel ID found (custom templates)
+                if (!results.pixelInfo.meta.found && results.tagstackInfo?.tags) {
+                    const facebookTags = results.tagstackInfo.tags.filter(tag => {
+                        const name = (tag.name || '').toLowerCase();
+                        const type = (tag.type || '').toLowerCase();
+                        const templateId = (tag.templateId || '').toLowerCase();
+                        return name.includes('facebook') || 
+                               name.includes('meta') || 
+                               type.includes('facebook') ||
+                               type.includes('meta') ||
+                               templateId.includes('facebook') ||
+                               templateId.includes('meta') ||
+                               (tag.parameters && tag.parameters.some(p => 
+                                   (p.key || '').toLowerCase().includes('facebook') ||
+                                   (p.key || '').toLowerCase().includes('meta') ||
+                                   (p.parameterValue || '').toString().includes('connect.facebook.net')
+                               ));
+                    });
+                    
+                    if (facebookTags.length > 0) {
+                        results.pixelInfo.meta.found = true;
+                        results.pixelInfo.meta.methods.push('gtm-tag-detection');
+                        // Mark that pixel is detected but ID not found
+                        results.pixelInfo.meta.pixelId = null;
+                        results.pixelInfo.meta.detectedViaGTM = true;
+                        results.pixelInfo.meta.gtmTagNames = facebookTags.map(t => t.name || t.type || 'Unknown').filter((v, i, a) => a.indexOf(v) === i);
+                        console.log(`✅ Meta Pixel detected via GTM tags (no pixel ID found): ${facebookTags.length} tag(s) found`);
+                    }
+                }
+
+                // TikTok Pixel: Combine Tagstack and direct detection
+                if (tagstackIds.tiktokPixel && tagstackIds.tiktokPixel.length > 0) {
+                    tagstackIds.tiktokPixel.forEach(id => {
+                        if (!results.pixelInfo.tiktok.pixelIds.includes(id)) {
+                            results.pixelInfo.tiktok.pixelIds.push(id);
+                        }
+                    });
+                    results.pixelInfo.tiktok.found = true;
+                    results.pixelInfo.tiktok.methods.push('tagstack-detection');
+                    // Use Tagstack ID as primary if available and no direct detection
+                    if (!results.pixelInfo.tiktok.pixelId) {
+                        results.pixelInfo.tiktok.pixelId = tagstackIds.tiktokPixel[0];
+                    }
+                }
+
+                // LinkedIn Pixel: Combine Tagstack and direct detection
+                if (tagstackIds.linkedinPixel && tagstackIds.linkedinPixel.length > 0) {
+                    tagstackIds.linkedinPixel.forEach(id => {
+                        if (!results.pixelInfo.linkedin.pixelIds.includes(id)) {
+                            results.pixelInfo.linkedin.pixelIds.push(id);
+                        }
+                    });
+                    results.pixelInfo.linkedin.found = true;
+                    results.pixelInfo.linkedin.methods.push('tagstack-detection');
+                    // Use Tagstack ID as primary if available and no direct detection
+                    if (!results.pixelInfo.linkedin.pixelId) {
+                        results.pixelInfo.linkedin.pixelId = tagstackIds.linkedinPixel[0];
+                    }
+                }
+
+                // Google Ads: Combine Tagstack and direct detection
+                if (tagstackIds.googleAds && tagstackIds.googleAds.length > 0) {
+                    tagstackIds.googleAds.forEach(id => {
+                        if (!results.pixelInfo.googleAds.conversionIds.includes(id)) {
+                            results.pixelInfo.googleAds.conversionIds.push(id);
+                        }
+                    });
+                    results.pixelInfo.googleAds.found = true;
+                    results.pixelInfo.googleAds.methods.push('tagstack-detection');
+                    // Use Tagstack ID as primary if available and no direct detection
+                    if (!results.pixelInfo.googleAds.conversionId) {
+                        results.pixelInfo.googleAds.conversionId = tagstackIds.googleAds[0];
+                    }
+                }
+            }
+
+            console.log('✅ Pixel scanning completed:', {
+                meta: results.pixelInfo.meta.found ? results.pixelInfo.meta.pixelIds : 'Not found',
+                tiktok: results.pixelInfo.tiktok.found ? results.pixelInfo.tiktok.pixelIds : 'Not found',
+                linkedin: results.pixelInfo.linkedin.found ? results.pixelInfo.linkedin.pixelIds : 'Not found',
+                googleAds: results.pixelInfo.googleAds.found ? results.pixelInfo.googleAds.conversionIds : 'Not found'
+            });
+        } catch (error) {
+            console.error('Pixel scanning error:', error);
+            results.pixelInfo = {
+                meta: { found: false, pixelIds: [], pixelId: null, methods: [] },
+                tiktok: { found: false, pixelIds: [], pixelId: null, methods: [] },
+                linkedin: { found: false, pixelIds: [], pixelId: null, methods: [] },
+                googleAds: { found: false, conversionIds: [], conversionId: null, methods: [] }
+            };
+        }
+
+        results.steps.push({
+            id: 8,
+            status: 'completed',
+            result: { success: true, message: 'Pixel scanning completed' }
         });
 
         results.success = true;

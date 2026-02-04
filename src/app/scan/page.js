@@ -12,7 +12,8 @@ const SCAN_STEPS = [
     { id: 5, title: "Analyzing Performance", description: "Fetching Core Web Vitals and metrics" },
     { id: 6, title: "Scanning GTM Containers", description: "Detecting Google Tag Manager implementations" },
     { id: 7, title: "Tagstack Analysis", description: "Analyzing GTM container with Tagstack" },
-    { id: 8, title: "Finalizing Results", description: "Preparing scan results" },
+    { id: 8, title: "Scanning Marketing Pixels", description: "Detecting Meta Pixel, TikTok, LinkedIn, and Google Ads" },
+    { id: 9, title: "Finalizing Results", description: "Preparing scan results" },
 ];
 
 function ScanContent() {

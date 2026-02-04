@@ -227,37 +227,60 @@ function ResultsContent() {
             await new Promise(resolve => setTimeout(resolve, 500));
             
             // Convert HTML to canvas using html2canvas-pro (supports oklab colors)
+            // Use white background for PDF (page background should be white)
             const canvas = await html2canvas(mainContent, {
                 scale: 2,
                 useCORS: true,
                 logging: false,
-                backgroundColor: '#ffffff',
+                backgroundColor: '#ffffff', // White background for PDF
                 windowWidth: mainContent.scrollWidth,
                 windowHeight: mainContent.scrollHeight,
                 allowTaint: false,
                 removeContainer: false
             });
             
-            // Calculate PDF dimensions
-            const imgWidth = 210; // A4 width in mm
+            // Calculate PDF dimensions with padding
+            const padding = 17; // 4rem/64px ≈ 17mm (64px / 96px per inch * 25.4mm per inch)
+            const pageWidth = 210; // A4 width in mm
             const pageHeight = 297; // A4 height in mm
+            const availableWidth = pageWidth - (padding * 2); // Account for left and right padding
+            const availableHeight = pageHeight - (padding * 2); // Account for top and bottom padding
+            const imgWidth = availableWidth;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            let heightLeft = imgHeight;
             
             // Create PDF
             const pdf = new jsPDF('p', 'mm', 'a4');
-            let position = 0;
+            let yPosition = padding; // Start with top padding
+            let heightLeft = imgHeight;
             
-            // Add first page
-            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
+            // Calculate pixels per mm for slicing
+            const pixelsPerMM = canvas.height / imgHeight;
+            const pixelsPerPage = availableHeight * pixelsPerMM;
+            let sourceY = 0; // Current position in source canvas
             
-            // Add additional pages if content is taller than one page
-            while (heightLeft > 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+            // Add pages until all content is rendered
+            while (sourceY < canvas.height) {
+                // Calculate how much of the image to show on this page
+                const remainingPixels = canvas.height - sourceY;
+                const pagePixels = Math.min(pixelsPerPage, remainingPixels);
+                const pageDisplayHeight = pagePixels / pixelsPerMM;
+                
+                // Create a temporary canvas for this page slice
+                const pageCanvas = document.createElement('canvas');
+                pageCanvas.width = canvas.width;
+                pageCanvas.height = pagePixels;
+                const ctx = pageCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, sourceY, canvas.width, pagePixels, 0, 0, canvas.width, pagePixels);
+                
+                // Add image slice to PDF with padding
+                pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', padding, yPosition, imgWidth, pageDisplayHeight);
+                
+                // Move to next page if there's more content
+                sourceY += pagePixels;
+                if (sourceY < canvas.height) {
+                    pdf.addPage();
+                    yPosition = padding; // Reset Y position for new page
+                }
             }
             
             // Save PDF
@@ -462,7 +485,8 @@ function ResultsContent() {
                     tagstackInfo: scanData.tagstackInfo || null,
                     // Use Consent Mode V2 from Tagstack, fallback to scan data
                     consentModeV2: scanData.tagstackInfo?.consentModeV2 ?? scanData.consentModeV2 ?? false,
-                    serverSideTracking: false, // TODO: Extract from Tagstack if available
+                    // Use server-side tracking from Tagstack, fallback to scan data
+                    serverSideTracking: scanData.tagstackInfo?.serverSideTracking ?? scanData.serverSideTracking ?? false,
                     marketingScripts: {
                         gtm: {
                             found: scanData.gtmInfo?.found || false,
@@ -487,24 +511,38 @@ function ResultsContent() {
                             streams: scanData.tagstackInfo?.ga4Streams || []
                         },
                         meta: {
-                            found: (scanData.tagstackInfo?.detectedIds?.facebookPixel?.length || 0) > 0,
-                            pixelId: scanData.tagstackInfo?.detectedIds?.facebookPixel?.[0] || null,
-                            pixelIds: scanData.tagstackInfo?.detectedIds?.facebookPixel || [],
+                            found: (scanData.pixelInfo?.meta?.found || scanData.tagstackInfo?.detectedIds?.facebookPixel?.length || 0) > 0,
+                            pixelId: scanData.pixelInfo?.meta?.pixelId || scanData.tagstackInfo?.detectedIds?.facebookPixel?.[0] || null,
+                            pixelIds: [
+                                ...(scanData.pixelInfo?.meta?.pixelIds || []),
+                                ...(scanData.tagstackInfo?.detectedIds?.facebookPixel || [])
+                            ].filter((v, i, a) => a.indexOf(v) === i), // Remove duplicates
                             conversionsApi: false, // TODO: Extract from Tagstack if available
                             customAudiences: false
                         },
                         tiktok: {
-                            found: false,
-                            pixelId: null
+                            found: (scanData.pixelInfo?.tiktok?.found || scanData.tagstackInfo?.detectedIds?.tiktokPixel?.length || 0) > 0,
+                            pixelId: scanData.pixelInfo?.tiktok?.pixelId || scanData.tagstackInfo?.detectedIds?.tiktokPixel?.[0] || null,
+                            pixelIds: [
+                                ...(scanData.pixelInfo?.tiktok?.pixelIds || []),
+                                ...(scanData.tagstackInfo?.detectedIds?.tiktokPixel || [])
+                            ].filter((v, i, a) => a.indexOf(v) === i) // Remove duplicates
                         },
                         linkedin: {
-                            found: false,
-                            pixelId: null
+                            found: (scanData.pixelInfo?.linkedin?.found || scanData.tagstackInfo?.detectedIds?.linkedinPixel?.length || 0) > 0,
+                            pixelId: scanData.pixelInfo?.linkedin?.pixelId || scanData.tagstackInfo?.detectedIds?.linkedinPixel?.[0] || null,
+                            pixelIds: [
+                                ...(scanData.pixelInfo?.linkedin?.pixelIds || []),
+                                ...(scanData.tagstackInfo?.detectedIds?.linkedinPixel || [])
+                            ].filter((v, i, a) => a.indexOf(v) === i) // Remove duplicates
                         },
                         googleAds: {
-                            found: (scanData.tagstackInfo?.detectedIds?.googleAds?.length || 0) > 0,
-                            conversionId: scanData.tagstackInfo?.detectedIds?.googleAds?.[0] || null,
-                            conversionIds: scanData.tagstackInfo?.detectedIds?.googleAds || [],
+                            found: (scanData.pixelInfo?.googleAds?.found || scanData.tagstackInfo?.detectedIds?.googleAds?.length || 0) > 0,
+                            conversionId: scanData.pixelInfo?.googleAds?.conversionId || scanData.tagstackInfo?.detectedIds?.googleAds?.[0] || null,
+                            conversionIds: [
+                                ...(scanData.pixelInfo?.googleAds?.conversionIds || []),
+                                ...(scanData.tagstackInfo?.detectedIds?.googleAds || [])
+                            ].filter((v, i, a) => a.indexOf(v) === i), // Remove duplicates
                             remarketing: false
                         }
                     },
@@ -731,9 +769,9 @@ function ResultsContent() {
             cookieAccepted: cookieInfo.accepted
         });
 
-        // Calculate tracking score - BE MORE CRITICAL
-        // Start from a base score (IGNORE initial tracking score from results)
-        trackingScore = 50; // Start at 50 (neutral)
+        // Calculate tracking score - STRUCTURED APPROACH (Max 100 points)
+        // Each category has a maximum, ensuring total never exceeds 100
+        trackingScore = 0; // Start from 0
         
         const marketingScripts = results.marketingScripts || {};
         
@@ -745,89 +783,110 @@ function ResultsContent() {
             tiktokFound: marketingScripts.tiktok?.found,
             linkedinFound: marketingScripts.linkedin?.found,
             googleAdsFound: marketingScripts.googleAds?.found,
-            consentModeV2: results.tagstackInfo?.consentModeV2
+            consentModeV2: results.consentModeV2 ?? results.tagstackInfo?.consentModeV2
         });
         
-        // GTM Implementation (Base requirement - 30 points)
+        const scoreBreakdown = {
+            gtm: 0,
+            consentModeV2: 0,
+            serverSideTracking: 0,
+            ga4: 0,
+            pixels: 0,
+            tagQuality: 0
+        };
+        
+        // Category 1: GTM Implementation (25 points max)
         if (results.gtmInfo?.found) {
-            trackingScore += 30; // Base bonus for GTM presence
+            scoreBreakdown.gtm = 25; // Base score for GTM presence
+            trackingScore += 25;
             
-            // Additional bonuses from Tagstack analysis
+            // Additional quality points from Tagstack analysis (up to 5 points)
             if (results.tagstackInfo) {
                 const containerStats = results.tagstackInfo.containerStats;
                 const primaryContainer = results.gtmInfo.containers?.[0];
                 
                 if (containerStats?.[primaryContainer]) {
                     const stats = containerStats[primaryContainer];
-                    // Bonus for having tags configured (up to 10 points)
-                    if (stats.tags > 0) {
-                        trackingScore += Math.min(10, stats.tags / 2);
+                    // Quality bonus: active tags vs paused tags ratio
+                    if (stats.tags > 0 && stats.activeTags > 0) {
+                        const activeRatio = stats.activeTags / stats.tags;
+                        // Bonus for high active tag ratio (up to 5 points)
+                        const qualityBonus = Math.min(5, Math.round(activeRatio * 5));
+                        scoreBreakdown.tagQuality = qualityBonus;
+                        trackingScore += qualityBonus;
                     }
-                    // Penalty for paused tags (indicates poor maintenance)
-                    if (stats.pausedTags > 0) {
-                        trackingScore -= Math.min(15, stats.pausedTags * 3);
-                    }
-                    // Bonus for active tags (up to 10 points)
-                    if (stats.activeTags > 0) {
-                        trackingScore += Math.min(10, stats.activeTags / 2);
+                    // Penalty for paused tags (reduce quality bonus)
+                    if (stats.pausedTags > 0 && stats.tags > 0) {
+                        const pausedRatio = stats.pausedTags / stats.tags;
+                        const qualityPenalty = Math.min(scoreBreakdown.tagQuality, Math.round(pausedRatio * 5));
+                        scoreBreakdown.tagQuality -= qualityPenalty;
+                        trackingScore -= qualityPenalty;
                     }
                 }
-                
-                // Bonus for Consent Mode V2 (10 points)
-                if (results.tagstackInfo.consentModeV2) {
-                    trackingScore += 10;
-                }
             }
-        } else {
-            // Severe penalty for no GTM found
-            trackingScore -= 30;
         }
         
-        // GA4 Implementation (10 points)
-        if (marketingScripts.ga4?.found) {
-            trackingScore += 10;
-            // Bonus for enhanced ecommerce (5 points)
-            if (marketingScripts.ga4.enhancedEcommerce) {
-                trackingScore += 5;
-            }
+        // Category 2: Consent Mode V2 (25 points max) - CRITICAL
+        const consentModeV2Enabled = results.consentModeV2 ?? results.tagstackInfo?.consentModeV2 ?? false;
+        console.log('Consent Mode V2 check:', {
+            resultsConsentModeV2: results.consentModeV2,
+            tagstackConsentModeV2: results.tagstackInfo?.consentModeV2,
+            finalValue: consentModeV2Enabled
+        });
+        if (consentModeV2Enabled) {
+            scoreBreakdown.consentModeV2 = 25; // Full points for Consent Mode V2
+            trackingScore += 25;
+            console.log('Consent Mode V2 enabled: +25 points');
         } else {
-            trackingScore -= 10; // Penalty for missing GA4
+            console.log('Consent Mode V2 disabled: 0 points (critical requirement)');
         }
         
-        // Server-side Tracking (15 points) - CRITICAL MISSING FEATURE
+        // Category 3: Server-side Tracking (15 points max)
         if (results.serverSideTracking) {
+            scoreBreakdown.serverSideTracking = 15;
             trackingScore += 15;
-        } else {
-            trackingScore -= 15; // Penalty for missing server-side tracking
         }
         
-        // Meta Pixel (5 points)
-        if (marketingScripts.meta?.found) {
-            trackingScore += 5;
-        } else {
-            trackingScore -= 5; // Penalty for missing Meta Pixel
+        // Category 4: GA4 Implementation (10 points max)
+        if (marketingScripts.ga4?.found) {
+            scoreBreakdown.ga4 = 10;
+            trackingScore += 10;
         }
         
-        // TikTok Pixel (5 points)
-        if (marketingScripts.tiktok?.found) {
+        // Category 5: Marketing Pixels (20 points max - combined check)
+        // Check how many of the 4 main pixels are present
+        const pixelsFound = [
+            marketingScripts.meta?.found,
+            marketingScripts.tiktok?.found,
+            marketingScripts.linkedin?.found,
+            marketingScripts.googleAds?.found
+        ].filter(Boolean).length;
+        
+        // Award points based on pixel coverage (0-4 pixels = 0-20 points)
+        // All 4 pixels = 20 points, 3 pixels = 15 points, 2 pixels = 10 points, 1 pixel = 5 points
+        if (pixelsFound === 4) {
+            scoreBreakdown.pixels = 20;
+            trackingScore += 20;
+        } else if (pixelsFound === 3) {
+            scoreBreakdown.pixels = 15;
+            trackingScore += 15;
+        } else if (pixelsFound === 2) {
+            scoreBreakdown.pixels = 10;
+            trackingScore += 10;
+        } else if (pixelsFound === 1) {
+            scoreBreakdown.pixels = 5;
             trackingScore += 5;
-        } else {
-            trackingScore -= 5; // Penalty for missing TikTok Pixel
         }
         
-        // LinkedIn Insight (5 points)
-        if (marketingScripts.linkedin?.found) {
-            trackingScore += 5;
-        } else {
-            trackingScore -= 5; // Penalty for missing LinkedIn Insight
-        }
-        
-        // Google Ads (5 points)
-        if (marketingScripts.googleAds?.found) {
-            trackingScore += 5;
-        } else {
-            trackingScore -= 5; // Penalty for missing Google Ads
-        }
+        console.log('Tracking score breakdown:', {
+            gtm: scoreBreakdown.gtm,
+            tagQuality: scoreBreakdown.tagQuality,
+            consentModeV2: scoreBreakdown.consentModeV2,
+            serverSideTracking: scoreBreakdown.serverSideTracking,
+            ga4: scoreBreakdown.ga4,
+            pixels: `${pixelsFound}/4 = ${scoreBreakdown.pixels}`,
+            totalBeforeClamp: trackingScore
+        });
 
         // Calculate Compliance Score from scratch - BE MORE CRITICAL
         // Based on 2026 compliance standards (GDPR, CCPA, ePrivacy Directive)
@@ -913,7 +972,10 @@ function ResultsContent() {
         // Clamp all scores between 0-100
         performanceScore = Math.max(0, Math.min(100, performanceScore));
         privacyScore = Math.max(0, Math.min(100, privacyScore));
+        // Log final tracking score before clamping
+        console.log('Tracking score before clamping:', trackingScore);
         trackingScore = Math.max(0, Math.min(100, trackingScore));
+        console.log('Tracking score after clamping:', trackingScore);
         complianceScore = Math.max(0, Math.min(100, complianceScore));
         
         console.log('Final calculated scores:', {

@@ -141,19 +141,98 @@ function extractGTMFromStape(scriptContent) {
 }
 
 /**
+ * Check browser context for GTM containers (mimics Tag Assistant behavior)
+ * @param {Function} pageEvaluate - Function to execute code in browser context
+ */
+async function checkGTMInBrowser(pageEvaluate) {
+    const containers = new Set();
+    
+    try {
+        // Method 1: Check window.google_tag_manager (most reliable for dynamically loaded GTM)
+        const gtmObject = await pageEvaluate(() => {
+            if (window.google_tag_manager) {
+                const gtmKeys = Object.keys(window.google_tag_manager);
+                return {
+                    exists: true,
+                    keys: gtmKeys.filter(key => {
+                        // Filter for GTM container IDs (format: GTM-XXXXXX)
+                        return key.match(/^GTM-[A-Z0-9]{6,}$/);
+                    })
+                };
+            }
+            return { exists: false, keys: [] };
+        });
+        
+        if (gtmObject.exists && gtmObject.keys.length > 0) {
+            console.log(`Found GTM containers in window.google_tag_manager: ${gtmObject.keys.join(', ')}`);
+            gtmObject.keys.forEach(key => containers.add(key));
+        }
+        
+        // Method 2: Check window.dataLayer for GTM references
+        const dataLayerCheck = await pageEvaluate(() => {
+            if (window.dataLayer && Array.isArray(window.dataLayer)) {
+                // Check if dataLayer has GTM events (indicates GTM is active)
+                const hasGTMEvents = window.dataLayer.some(item => 
+                    item && (item.event === 'gtm.js' || item['gtm.start'])
+                );
+                return { exists: true, hasGTMEvents };
+            }
+            return { exists: false, hasGTMEvents: false };
+        });
+        
+        if (dataLayerCheck.exists && dataLayerCheck.hasGTMEvents) {
+            console.log('GTM is active (dataLayer contains gtm.js events)');
+        }
+        
+        // Method 3: Check DOM for GTM script tags (after dynamic loading)
+        const gtmScripts = await pageEvaluate(() => {
+            const scripts = Array.from(document.querySelectorAll('script[src*="googletagmanager.com/gtm.js"]'));
+            return scripts.map(script => {
+                const match = script.src.match(/id=(GTM-[A-Z0-9]+)/);
+                return match ? match[1] : null;
+            }).filter(id => id !== null);
+        });
+        
+        if (gtmScripts.length > 0) {
+            console.log(`Found GTM script tags in DOM: ${gtmScripts.join(', ')}`);
+            gtmScripts.forEach(id => containers.add(id));
+        }
+        
+    } catch (error) {
+        console.warn('Error checking browser context for GTM:', error.message);
+    }
+    
+    return Array.from(containers);
+}
+
+/**
  * Scan for GTM containers in website content
  * @param {string} html - HTML content
  * @param {string} baseUrl - Base URL for constructing relative URLs
  * @param {Function} fetchScript - Optional function to fetch external scripts
+ * @param {Function} pageEvaluate - Optional function to execute code in browser context
  */
-async function scanForGTM(html, baseUrl = '', fetchScript = null) {
+async function scanForGTM(html, baseUrl = '', fetchScript = null, pageEvaluate = null) {
     const containers = new Set();
 
     // Step 1: Extract from HTML
     const htmlGTM = extractGTMContainers(html);
     htmlGTM.forEach(container => containers.add(container));
 
-    // Step 2: Check for third-party scripts (Stape, etc.)
+    // Step 2: Check browser context (most reliable for dynamically loaded GTM)
+    if (pageEvaluate) {
+        try {
+            const browserGTM = await checkGTMInBrowser(pageEvaluate);
+            browserGTM.forEach(container => containers.add(container));
+            if (browserGTM.length > 0) {
+                console.log(`✅ Found ${browserGTM.length} GTM container(s) via browser context check`);
+            }
+        } catch (error) {
+            console.warn('Browser context check failed:', error.message);
+        }
+    }
+
+    // Step 3: Check for third-party scripts (Stape, etc.)
     if (baseUrl && fetchScript) {
         const stapeUrls = findStapeScripts(html, baseUrl);
         
@@ -181,5 +260,6 @@ export {
     scanForGTM, 
     extractGTMContainers, 
     findStapeScripts, 
-    extractGTMFromStape 
+    extractGTMFromStape,
+    checkGTMInBrowser
 };

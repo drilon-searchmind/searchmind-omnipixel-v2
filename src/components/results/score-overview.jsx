@@ -29,7 +29,7 @@ export function ScoreOverview({ results, totalScore }) {
             </div>
 
             {/* Performance Score */}
-            <div className="border border-border/40 rounded p-6 bg-foreground/80">
+            <div className="border border-border/40 rounded p-6 bg-foreground/90">
                 <div className="space-y-3">
                     <div className="flex items-center gap-2">
                         <FaTachometerAlt className="w-4 h-4 text-foreground/50" />
@@ -57,7 +57,7 @@ export function ScoreOverview({ results, totalScore }) {
             </div>
 
             {/* Consent Mode V2 */}
-            <div className="border border-border/40 rounded p-6 bg-foreground/60">
+            <div className="border border-border/40 rounded p-6 bg-foreground/80">
                 <div className="space-y-3">
                     <div className="flex items-center gap-2">
                         <FaShieldAlt className="w-4 h-4 text-foreground/50" />
@@ -74,17 +74,17 @@ export function ScoreOverview({ results, totalScore }) {
             </div>
 
             {/* Server-side Tracking */}
-            <div className="border border-border/40 rounded p-6 bg-foreground/40">
+            <div className="border border-border/40 rounded p-6 bg-foreground/70">
                 <div className="space-y-3">
                     <div className="flex items-center gap-2">
                         <FaServer className="w-4 h-4 text-foreground/50" />
-                        <div className="text-sm font-light text-foreground/70">Server-side Tracking</div>
+                        <div className="text-sm font-light text-background/70">Server-side Tracking</div>
                     </div>
                     <div className="flex items-center gap-2">
                         {results.serverSideTracking ? (
-                            <><FaCheck className="w-4 h-4 text-foreground" /> <span className="text-sm font-light text-foreground">Active</span></>
+                            <><FaCheck className="w-4 h-4 text-foreground" /> <span className="text-sm font-light text-background">Active</span></>
                         ) : (
-                            <><FaTimes className="w-4 h-4 text-foreground/40" /> <span className="text-sm font-light text-foreground/60">Not Detected</span></>
+                            <><FaTimes className="w-4 h-4 text-foreground/40" /> <span className="text-sm font-light text-background/60">Not Detected</span></>
                         )}
                     </div>
                 </div>

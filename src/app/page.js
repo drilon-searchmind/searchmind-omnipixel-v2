@@ -3,6 +3,7 @@
 import { UrlScanner } from "@/components/url-scanner";
 import { HeroSection } from "@/components/home/hero-section";
 import { FeaturesSection } from "@/components/home/features-section";
+import PreviousScans from "@/components/previous-scans";
 
 export default function Home() {
 	return (
@@ -23,6 +24,7 @@ export default function Home() {
 							</p>
 						</div>
 						<UrlScanner />
+						<PreviousScans />
 					</div>
 				</div>
 			</section>

@@ -165,10 +165,13 @@ export function processTagstackData(tagstackData) {
             consentModeV2: false,
             cmp: null,
             consentDefaults: null,
+            serverSideTracking: false,
             detectedIds: {
                 ga4: [],
                 facebookPixel: [],
-                googleAds: []
+                googleAds: [],
+                tiktokPixel: [],
+                linkedinPixel: []
             },
             containerStats: {},
             tags: [],
@@ -183,17 +186,27 @@ export function processTagstackData(tagstackData) {
     const detectedIds = {
         ga4: [],
         facebookPixel: [],
-        googleAds: []
+        googleAds: [],
+        tiktokPixel: [],
+        linkedinPixel: []
     };
     let consentModeV2 = false;
     let cmp = null;
     let consentDefaults = null;
+    let serverSideTracking = false; // Track server-side GTM/GA4
     const containerStats = {};
     const allTags = [];
     const allVariables = [];
     const allTriggers = [];
 
     Object.entries(containers).forEach(([containerId, containerData]) => {
+        // Check for server-side tracking indicators FIRST (before entity type check)
+        // Tagstack API returns ga4ServerSide as a property on containers
+        if (containerData.ga4ServerSide === true) {
+            serverSideTracking = true;
+            console.log(`✅ Server-side tracking detected via ga4ServerSide property: ${containerId} (${containerData.entityType})`);
+        }
+        
         if (containerData.entityType === 'GTM Container') {
             gtmContainers.push({
                 id: containerId,
@@ -302,11 +315,41 @@ export function processTagstackData(tagstackData) {
                     }
 
                     // Extract Facebook Pixel IDs (if present in tag parameters)
-                    if (tag.name?.includes('Facebook') || tag.name?.includes('Meta') || tag.type?.includes('facebook')) {
-                        const pixelId = getParamValue('pixelId') || getParamValue('id');
+                    // Also check for Facebook/Meta tags even without pixel ID (custom templates)
+                    const isFacebookTag = tag.name?.toLowerCase().includes('facebook') || 
+                                         tag.name?.toLowerCase().includes('meta') || 
+                                         tag.type?.toLowerCase().includes('facebook') ||
+                                         tag.type?.toLowerCase().includes('meta') ||
+                                         tag.templateId?.toLowerCase().includes('facebook') ||
+                                         tag.templateId?.toLowerCase().includes('meta');
+                    
+                    if (isFacebookTag) {
+                        const pixelId = getParamValue('pixelId') || getParamValue('id') || getParamValue('pixel_id');
                         if (pixelId && typeof pixelId === 'string' && /^\d+$/.test(pixelId)) {
                             if (!detectedIds.facebookPixel.includes(pixelId)) {
                                 detectedIds.facebookPixel.push(pixelId);
+                            }
+                        }
+                        // Note: Even if no pixel ID found, the tag itself indicates Facebook/Meta presence
+                        // This will be handled in the scanner by checking tags array
+                    }
+
+                    // Extract TikTok Pixel IDs
+                    if (tag.name?.includes('TikTok') || tag.type?.includes('tiktok')) {
+                        const pixelId = getParamValue('pixelId') || getParamValue('id');
+                        if (pixelId && typeof pixelId === 'string' && /^\d+$/.test(pixelId)) {
+                            if (!detectedIds.tiktokPixel.includes(pixelId)) {
+                                detectedIds.tiktokPixel.push(pixelId);
+                            }
+                        }
+                    }
+
+                    // Extract LinkedIn Insight Tag IDs
+                    if (tag.name?.includes('LinkedIn') || tag.type?.includes('linkedin')) {
+                        const pixelId = getParamValue('partnerId') || getParamValue('pid') || getParamValue('id');
+                        if (pixelId && typeof pixelId === 'string' && /^\d+$/.test(pixelId)) {
+                            if (!detectedIds.linkedinPixel.includes(pixelId)) {
+                                detectedIds.linkedinPixel.push(pixelId);
                             }
                         }
                     }
@@ -323,6 +366,45 @@ export function processTagstackData(tagstackData) {
             if (!detectedIds.ga4.includes(containerId)) {
                 detectedIds.ga4.push(containerId);
             }
+            
+            // Check for server-side tracking indicators
+            // Tagstack API returns ga4ServerSide as a boolean field
+            if (containerData.ga4ServerSide === true) {
+                serverSideTracking = true;
+                console.log(`✅ Server-side tracking detected in GA4 Stream: ${containerId}`);
+            }
+            // Also check for other server-side indicators
+            if (containerData.measurementProtocolSecret || containerData.serverContainerUrl) {
+                serverSideTracking = true;
+                console.log(`✅ Server-side tracking detected via measurementProtocolSecret/serverContainerUrl: ${containerId}`);
+            }
+        }
+    });
+    
+    // Also check GTM containers for server-side indicators
+    gtmContainers.forEach(container => {
+        // Check if container has server-side tags or server container configuration
+        if (container.serverContainerUrl || container.serverContainerName) {
+            serverSideTracking = true;
+            console.log(`✅ Server-side tracking detected via serverContainerUrl/serverContainerName: ${container.id}`);
+        }
+        // Check for ga4ServerSide property on GTM container (Tagstack might set this)
+        if (container.ga4ServerSide === true) {
+            serverSideTracking = true;
+            console.log(`✅ Server-side tracking detected via ga4ServerSide on GTM container: ${container.id}`);
+        }
+        // Check tags for server-side GTM tags
+        if (container.tags) {
+            const hasServerSideTags = container.tags.some(tag => 
+                tag.type === 'sgtm' || 
+                tag.name?.toLowerCase().includes('server-side') ||
+                tag.name?.toLowerCase().includes('server side') ||
+                tag.type?.includes('server')
+            );
+            if (hasServerSideTags) {
+                serverSideTracking = true;
+                console.log(`✅ Server-side tracking detected via GTM tags: ${container.id}`);
+            }
         }
     });
 
@@ -332,6 +414,7 @@ export function processTagstackData(tagstackData) {
         consentModeV2,
         cmp,
         consentDefaults,
+        serverSideTracking,
         detectedIds,
         containerStats,
         tags: allTags,
