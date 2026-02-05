@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState, Suspense, useRef } from "react";
+import { useEffect, useState, Suspense, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
     FaGoogle,
@@ -28,6 +28,146 @@ import { TagstackInsights } from "@/components/results/tagstack-insights";
 import { MartechSummary } from "@/components/results/martech-summary";
 import { JsonLdAnalysis } from "@/components/results/jsonld-analysis";
 
+// Indicator Line Component - shows active section marker
+function IndicatorLine({ activeSection }) {
+    const [markerPosition, setMarkerPosition] = useState(0);
+    const [markerHeight, setMarkerHeight] = useState(0);
+    const [markerTop, setMarkerTop] = useState(0);
+    const containerRef = useRef(null);
+
+    // Calculate marker position based on active section
+    const updateMarkerPosition = useCallback(() => {
+        // Find the nav element inside the TableOfContents
+        const tocContainer = document.querySelector('[data-toc-container]');
+        if (!tocContainer) return;
+
+        const nav = tocContainer.querySelector('nav');
+        if (!nav) return;
+
+        const activeButton = nav.querySelector(`[data-section-id="${activeSection}"]`);
+        if (!activeButton) return;
+
+        // Find the corresponding content section in the main area
+        const contentSection = document.getElementById(activeSection);
+        if (!contentSection) {
+            // Fallback to button height if content section not found
+            const buttonRect = activeButton.getBoundingClientRect();
+            const containerRect = tocContainer.getBoundingClientRect();
+            const position = buttonRect.top - containerRect.top + (buttonRect.height / 2);
+            setMarkerPosition(position);
+            setMarkerHeight(buttonRect.height);
+            setMarkerTop(position - buttonRect.height / 2);
+            return;
+        }
+
+        // Find the parent flex container (the one with gap-12)
+        const flexContainer = tocContainer.closest('.flex.gap-12');
+        if (!flexContainer) return;
+
+        const buttonRect = activeButton.getBoundingClientRect();
+        const contentRect = contentSection.getBoundingClientRect();
+        const containerRect = flexContainer.getBoundingClientRect();
+        const tocRect = tocContainer.getBoundingClientRect();
+
+        // Calculate marker position (center of button) relative to flex container
+        const buttonCenter = buttonRect.top - containerRect.top + (buttonRect.height / 2);
+        
+        // Calculate the visible intersection between content section and viewport
+        const viewportTop = containerRect.top;
+        const viewportBottom = containerRect.bottom;
+        const contentTop = contentRect.top;
+        const contentBottom = contentRect.bottom;
+
+        // Find the intersection - how much of content is visible in viewport
+        const visibleTop = Math.max(contentTop, viewportTop);
+        const visibleBottom = Math.min(contentBottom, viewportBottom);
+        
+        // Calculate how much of the content is visible
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+        
+        // Calculate the top position of the marker relative to the flex container
+        const markerStartTop = visibleTop - containerRect.top;
+        
+        // If content extends beyond viewport, adjust the marker
+        if (visibleHeight > 0) {
+            // The marker should extend from where content starts to where it ends
+            setMarkerTop(markerStartTop);
+            setMarkerHeight(visibleHeight);
+            setMarkerPosition(buttonCenter); // Keep button center for horizontal indicator
+        } else {
+            // Content is not visible in viewport, just show button height
+            setMarkerPosition(buttonCenter);
+            setMarkerHeight(buttonRect.height);
+            setMarkerTop(buttonCenter - buttonRect.height / 2);
+        }
+    }, [activeSection]);
+
+    // Update position when active section changes
+    useEffect(() => {
+        updateMarkerPosition();
+    }, [activeSection, updateMarkerPosition]);
+
+    // Update position on scroll (for sticky positioning)
+    useEffect(() => {
+        const handleScroll = () => {
+            updateMarkerPosition();
+        };
+
+        // Use requestAnimationFrame for smooth updates
+        let rafId;
+        const throttledScroll = () => {
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+                handleScroll();
+                rafId = null;
+            });
+        };
+
+        window.addEventListener('scroll', throttledScroll, { passive: true });
+        window.addEventListener('resize', throttledScroll, { passive: true });
+
+        // Initial calculation
+        setTimeout(updateMarkerPosition, 100);
+
+        return () => {
+            window.removeEventListener('scroll', throttledScroll);
+            window.removeEventListener('resize', throttledScroll);
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [updateMarkerPosition]);
+
+    return (
+        <div ref={containerRef} className="absolute left-0 top-0 bottom-0 w-px pointer-events-none">
+            {/* Vertical line background */}
+            <div className="absolute left-0 top-0 bottom-0 w-px bg-foreground/20 pointer-events-none" />
+            {/* Active section marker */}
+            {markerPosition > 0 && markerHeight > 0 && (
+                <>
+                    {/* Horizontal line extending left from vertical line - points to button */}
+                    <div
+                        className="absolute bg-foreground/60 transition-all duration-300 ease-out pointer-events-none"
+                        style={{
+                            left: '0px',
+                            top: `${markerPosition - 1}px`,
+                            width: '8px',
+                            height: '2px'
+                        }}
+                    />
+                    {/* Vertical highlight bar - extends to match content section height */}
+                    <div
+                        className="absolute left-0 w-1 bg-foreground/60 transition-all duration-300 ease-out pointer-events-none"
+                        style={{
+                            top: `${markerTop}px`,
+                            height: `${markerHeight}px`,
+                            transform: 'translateX(0)'
+                        }}
+                    />
+                </>
+            )}
+        </div>
+    );
+}
+
 // Table of Contents Sidebar Component
 function TableOfContents({ activeSection, onSectionClick, isMobile = false, onClose }) {
     const sections = [
@@ -48,7 +188,7 @@ function TableOfContents({ activeSection, onSectionClick, isMobile = false, onCl
     };
 
     return (
-        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background/80 backdrop-blur-sm' : 'sticky top-20 h-fit max-h-[calc(100vh-6rem)] overflow-y-auto'}`}>
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background/80 backdrop-blur-sm' : 'sticky top-20 h-fit overflow-y-auto'}`} data-toc-container>
             <div className={`bg-background border border-border/40 rounded p-4 ${isMobile ? 'fixed top-20 left-4 right-4 max-w-sm mx-auto' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-normal text-xs uppercase tracking-wider text-foreground/50">
@@ -66,13 +206,15 @@ function TableOfContents({ activeSection, onSectionClick, isMobile = false, onCl
                     )}
                 </div>
                 <nav className="space-y-0.5">
+
                     {sections.map((section) => {
                         const Icon = section.icon;
                         return (
                             <button
                                 key={section.id}
+                                data-section-id={section.id}
                                 onClick={() => handleSectionClick(section.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2 text-left text-sm rounded transition-colors ${
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-left text-sm rounded transition-colors relative ${
                                     activeSection === section.id
                                         ? 'bg-foreground text-background font-normal'
                                         : 'text-foreground/60 hover:text-foreground hover:bg-secondary/50 font-light'
@@ -103,20 +245,58 @@ function ResultsContent() {
     const [isExporting, setIsExporting] = useState(false);
     const contentRef = useRef(null);
 
-    // Intersection Observer for active section tracking
+    // Intersection Observer for active section tracking with sticky threshold for small sections
     useEffect(() => {
+        const STICKY_THRESHOLD = 200; // Pixels from top to consider "sticky"
+        const MIN_SECTION_HEIGHT = 100; // Minimum height to consider a section "small"
+
         const observerOptions = {
             root: null,
             rootMargin: '-80px 0px -50% 0px',
-            threshold: 0
+            threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
         };
 
         const observerCallback = (entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    setActiveSection(entry.target.id);
+            // Get all visible sections sorted by their position
+            const visibleSections = entries
+                .filter(entry => entry.isIntersecting)
+                .map(entry => {
+                    const rect = entry.boundingClientRect;
+                    const distanceFromTop = rect.top;
+                    const sectionHeight = rect.height;
+                    const isSmall = sectionHeight < MIN_SECTION_HEIGHT;
+                    const isNearTop = distanceFromTop < STICKY_THRESHOLD && distanceFromTop > -rect.height;
+                    
+                    return {
+                        id: entry.target.id,
+                        distanceFromTop,
+                        sectionHeight,
+                        isSmall,
+                        isNearTop,
+                        intersectionRatio: entry.intersectionRatio,
+                        rect
+                    };
+                })
+                .sort((a, b) => {
+                    // Prioritize sections near the top
+                    if (a.isNearTop && !b.isNearTop) return -1;
+                    if (!a.isNearTop && b.isNearTop) return 1;
+                    // Then by distance from top
+                    return a.distanceFromTop - b.distanceFromTop;
+                });
+
+            if (visibleSections.length > 0) {
+                // Check if there's a small section near the top that should be sticky
+                const stickySection = visibleSections.find(s => s.isSmall && s.isNearTop);
+                
+                if (stickySection) {
+                    // Keep the small section active if it's near the top
+                    setActiveSection(stickySection.id);
+                } else {
+                    // Otherwise, use the first visible section (closest to top)
+                    setActiveSection(visibleSections[0].id);
                 }
-            });
+            }
         };
 
         const observer = new IntersectionObserver(observerCallback, observerOptions);
@@ -1034,10 +1214,14 @@ function ResultsContent() {
     return (
         <div className="min-h-screen py-12 px-6">
             <div className="container max-w-7xl mx-auto results-content-container" ref={contentRef}>
-                <div className="flex gap-12">
+                <div className="flex gap-12 relative">
                     {/* Table of Contents Sidebar */}
                     <div className="hidden lg:block w-56 flex-shrink-0">
                         <TableOfContents activeSection={activeSection} onSectionClick={scrollToSection} />
+                    </div>
+                    {/* Vertical line and marker - positioned between sidebar and content, outside sidebar constraints */}
+                    <div className="hidden lg:block absolute left-[14rem] top-0 bottom-0 w-px pointer-events-none">
+                        <IndicatorLine activeSection={activeSection} />
                     </div>
 
                     {/* Main Content */}
