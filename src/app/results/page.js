@@ -676,8 +676,8 @@ function ResultsContent() {
                         dataLayer: scanData.dataLayer || null,
                         // Use Consent Mode V2 from Tagstack, fallback to scan data
                         consentModeV2: scanData.tagstackInfo?.consentModeV2 ?? scanData.consentModeV2 ?? false,
-                        // Use server-side tracking from Tagstack, fallback to scan data
-                        serverSideTracking: scanData.tagstackInfo?.serverSideTracking ?? scanData.serverSideTracking ?? false,
+                    // Use server-side tracking from Tagstack, fallback to scan data, but prioritize platform detection
+                    serverSideTracking: scanData.serverSideTrackingPlatform ? true : (scanData.tagstackInfo?.serverSideTracking ?? scanData.serverSideTracking ?? false),
                         // Include server-side tracking platform info
                         serverSideTrackingPlatform: scanData.serverSideTrackingPlatform || null,
                         serverSideTrackingPlatforms: scanData.serverSideTrackingPlatforms || [],

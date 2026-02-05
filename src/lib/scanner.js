@@ -2197,11 +2197,13 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             if (platforms.profitmetrics.found) detectedPlatforms.push('Profitmetrics');
             if (platforms.triplewhale.found) detectedPlatforms.push('Triplewhale');
 
+
             if (detectedPlatforms.length > 0) {
                 results.serverSideTracking = true;
                 results.serverSideTrackingPlatform = detectedPlatforms[0]; // Primary platform
                 results.serverSideTrackingPlatforms = detectedPlatforms; // All detected platforms
                 console.log('✅ Server-side tracking detected via platform detection:', detectedPlatforms);
+                console.log('   Setting serverSideTrackingPlatform to:', results.serverSideTrackingPlatform);
             }
         }
 
