@@ -1,6 +1,6 @@
 import { FaTachometerAlt, FaShieldAlt, FaServer, FaCheck, FaTimes } from "react-icons/fa";
 
-export function ScoreOverview({ results, totalScore }) {
+export function ScoreOverview({ results, totalScore, serverSideTrackingPlatform }) {
     return (
         <div id="overview" className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pb-0">
             {/* Overall Score */}
@@ -82,7 +82,12 @@ export function ScoreOverview({ results, totalScore }) {
                     </div>
                     <div className="flex items-center gap-2">
                         {results.serverSideTracking ? (
-                            <><FaCheck className="w-4 h-4 text-foreground" /> <span className="text-sm font-light text-background">Active</span></>
+                            <>
+                                <FaCheck className="w-4 h-4 text-foreground" />
+                                <span className="text-sm font-light text-background">
+                                    {serverSideTrackingPlatform || results.serverSideTrackingPlatform || 'Active'}
+                                </span>
+                            </>
                         ) : (
                             <><FaTimes className="w-4 h-4 text-foreground/40" /> <span className="text-sm font-light text-background/60">Not Detected</span></>
                         )}

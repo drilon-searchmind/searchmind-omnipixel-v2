@@ -1014,6 +1014,7 @@ class WebsiteScanner {
                     onetrust: ['optanonconsent', 'optanonalertboxclosed', 'onetrustconsent'],
                     termly: ['termly-consent', 'termlyconsent'],
                     iubenda: ['iubenda', 'iub-consent', 'iubendaconsent'],
+                    shopify: ['cookieconsentdeclined', 'cookieconsentessentialgranted', 'cookieconsentmarketinggranted', 'cookieconsentpersonalizationgranted', 'cookieconsentpreferencesgranted', 'cookieconsentuserdata', 'cookiconsentpersonalization'],
                     generic: ['consent', 'cookie_consent', 'cookieconsent', 'gdpr_consent', 'privacy_consent', 'user_consent']
                 };
                 
@@ -1255,7 +1256,7 @@ class WebsiteScanner {
                                 const hasC0002 = cookie.value.includes('C0002:1');
                                 const hasC0003 = cookie.value.includes('C0003:1');
                                 const hasC0004 = cookie.value.includes('C0004:1');
-                                
+
                                 if (hasC0001 && hasC0002 && hasC0003 && hasC0004) {
                                     consentModeV2Detected = true;
                                     consentModeV2Details = {
@@ -1272,6 +1273,67 @@ class WebsiteScanner {
                                         }
                                     };
                                     break; // Found definitive consent, stop checking
+                                }
+                            }
+
+                            // PRIORITY 2.5: Check for Shopify consent cookies
+                            if (matchedProvider === 'shopify') {
+                                // Shopify consent cookies use the cookie name to indicate category and status
+                                // Examples: cookieConsentEssentialGranted=1, cookieConsentMarketingGranted=1, cookieConsentDeclined=0
+                                const shopifyCategories = {
+                                    necessary: false,
+                                    functional: false,
+                                    analytics: false,
+                                    advertisement: false,
+                                    marketing: false,
+                                    personalization: false,
+                                    preferences: false
+                                };
+
+                                // Check if this cookie indicates declined consent (overrides all)
+                                const isDeclined = nameLower.includes('cookieconsentdeclined') && isConsentGranted(cookie.value);
+                                if (isDeclined) {
+                                    // All categories declined
+                                    console.log(`    Shopify consent declined via cookie: ${cookie.name}`);
+                                } else {
+                                    // Check individual category grants
+                                    if (nameLower.includes('cookieconsentessentialgranted') && isConsentGranted(cookie.value)) {
+                                        shopifyCategories.necessary = true;
+                                        shopifyCategories.functional = true; // Essential often includes functional
+                                    }
+                                    if (nameLower.includes('cookieconsentmarketinggranted') && isConsentGranted(cookie.value)) {
+                                        shopifyCategories.advertisement = true;
+                                        shopifyCategories.marketing = true;
+                                    }
+                                    if (nameLower.includes('cookieconsentpersonalizationgranted') || nameLower.includes('cookiconsentpersonalization')) {
+                                        shopifyCategories.personalization = true;
+                                        shopifyCategories.functional = true; // Personalization is functional
+                                    }
+                                    if (nameLower.includes('cookieconsentpreferencesgranted') && isConsentGranted(cookie.value)) {
+                                        shopifyCategories.preferences = true;
+                                    }
+                                    if (nameLower.includes('cookieconsentuserdata') && isConsentGranted(cookie.value)) {
+                                        shopifyCategories.analytics = true; // User data often relates to analytics
+                                    }
+                                }
+
+                                // Count granted categories for Consent Mode V2 detection
+                                const grantedCount = Object.values(shopifyCategories).filter(Boolean).length;
+                                const totalCategories = Object.keys(shopifyCategories).length;
+
+                                if (grantedCount >= 4) { // At least essential + 3 other categories
+                                    consentModeV2Detected = true;
+                                    consentModeV2Details = {
+                                        detectedFrom: 'shopify-consent-cookies',
+                                        cookieName: cookie.name,
+                                        allCategoriesGranted: grantedCount === totalCategories,
+                                        detectionMethod: 'shopify-category-cookies',
+                                        categories: shopifyCategories,
+                                        grantedCategories: grantedCount,
+                                        totalCategories: totalCategories
+                                    };
+                                    console.log(`    Shopify consent detected: ${grantedCount}/${totalCategories} categories granted`);
+                                    break; // Found definitive Shopify consent, stop checking
                                 }
                             }
                             
@@ -1363,8 +1425,106 @@ class WebsiteScanner {
                         }
                     }
                 }
-                
-                // All cookies have been checked - the generic check above handles all CMPs
+
+                // Check dataLayer for Consent Mode V2 events
+                // This is a final check after cookie-based detection
+                if (!consentModeV2Detected) {
+                    try {
+                        console.log('Checking dataLayer for Consent Mode V2 events...');
+                        const dataLayerConsent = await this.page.evaluate(() => {
+                            if (!window.dataLayer || !Array.isArray(window.dataLayer)) {
+                                return null;
+                            }
+
+                            // Look for consent update events in dataLayer
+                            for (const event of window.dataLayer) {
+                                if (event && typeof event === 'object') {
+                                    // Check for consent update events
+                                    if (event.event === 'consent' && event.action === 'update') {
+                                        console.log('Found consent update event in dataLayer:', event);
+                                        return {
+                                            type: 'consent_update',
+                                            event: event.event,
+                                            action: event.action,
+                                            consent: event.consent || event[2], // consent object might be at index 2
+                                            fullEvent: event
+                                        };
+                                    }
+
+                                    // Check for gtag consent events (different format)
+                                    if (event[0] === 'consent' && event[1] === 'update') {
+                                        console.log('Found gtag consent update in dataLayer:', event);
+                                        return {
+                                            type: 'gtag_consent_update',
+                                            consent: event[2], // consent object at index 2
+                                            fullEvent: event
+                                        };
+                                    }
+
+                                    // Check for direct consent mode events
+                                    if (event.consent && typeof event.consent === 'object') {
+                                        // Check if this contains Google Consent Mode properties
+                                        const consentObj = event.consent;
+                                        const hasGoogleConsentProps = consentObj.ad_storage !== undefined ||
+                                                                     consentObj.analytics_storage !== undefined ||
+                                                                     consentObj.functionality_storage !== undefined ||
+                                                                     consentObj.security_storage !== undefined;
+
+                                        if (hasGoogleConsentProps) {
+                                            console.log('Found direct consent object in dataLayer:', consentObj);
+                                            return {
+                                                type: 'direct_consent_object',
+                                                consent: consentObj,
+                                                fullEvent: event
+                                            };
+                                        }
+                                    }
+                                }
+                            }
+                            return null;
+                        });
+
+                        if (dataLayerConsent) {
+                            console.log('DataLayer consent detected:', dataLayerConsent);
+
+                            // Extract consent categories from dataLayer
+                            const consentObj = dataLayerConsent.consent;
+                            if (consentObj && typeof consentObj === 'object') {
+                                const dataLayerCategories = {
+                                    ad_storage: consentObj.ad_storage,
+                                    analytics_storage: consentObj.analytics_storage,
+                                    functionality_storage: consentObj.functionality_storage,
+                                    security_storage: consentObj.security_storage,
+                                    personalization_storage: consentObj.personalization_storage,
+                                    ad_user_data: consentObj.ad_user_data,
+                                    ad_personalization: consentObj.ad_personalization
+                                };
+
+                                // Check if Google Consent Mode properties are present
+                                const hasGoogleConsentMode = Object.values(dataLayerCategories).some(val => val !== undefined);
+
+                                if (hasGoogleConsentMode) {
+                                    consentModeV2Detected = true;
+                                    consentModeV2Details = {
+                                        detectedFrom: 'datalayer-consent-event',
+                                        eventType: dataLayerConsent.type,
+                                        allCategoriesGranted: true, // DataLayer events indicate active consent management
+                                        detectionMethod: 'datalayer-consent-mode',
+                                        categories: dataLayerCategories,
+                                        dataLayerEvent: dataLayerConsent.fullEvent
+                                    };
+                                    console.log('✅ Consent Mode V2 detected via dataLayer event');
+                                }
+                            }
+                        } else {
+                            console.log('No consent events found in dataLayer');
+                        }
+                    } catch (dataLayerError) {
+                        console.warn('Error checking dataLayer for consent:', dataLayerError.message);
+                    }
+                }
+
+                // All cookies and dataLayer have been checked - the generic check above handles all CMPs
                 
                 const cmpName = result.cmp ? result.cmp.name : 'Text-based detection';
                 const message = `Accepted cookies using ${result.method} detection${result.cmp ? ` (${result.cmp.name})` : ''}: "${result.element.text}"`;
@@ -1423,6 +1583,7 @@ export async function executeInitialScan(url, onProgress = () => {}) {
     console.log(`Starting initial scan for URL: ${url}`);
 
     const scanner = new WebsiteScanner();
+    let requestListener = null;
     const results = {
         url,
         steps: [],
@@ -1449,10 +1610,60 @@ export async function executeInitialScan(url, onProgress = () => {}) {
         console.log('Step 1 completed successfully');
         // Send intermediate data
         if (typeof onProgress === 'function') {
-            onProgress(1, 'Scanner initialized successfully', { 
+            onProgress(1, 'Scanner initialized successfully', {
                 scannerInitialized: true,
-                platform: process.platform 
+                platform: process.platform
             });
+        }
+
+        // Set up network monitoring for platform detection (before navigation)
+        const networkRequests = [];
+        requestListener = (request) => {
+            const requestUrl = request.url();
+                // Capture requests to known platform endpoints
+                if (
+                    requestUrl.includes('reaktion.com') ||
+                    requestUrl.includes('profitmetrics.io') ||
+                    requestUrl.includes('triplewhale.com') ||
+                    requestUrl.includes('api.reaktion.com') ||
+                    requestUrl.includes('tracking/stores/') ||
+                    requestUrl.includes('/conversions')
+                ) {
+                    networkRequests.push({
+                        url: requestUrl,
+                        method: request.method(),
+                        resourceType: request.resourceType(),
+                        timestamp: Date.now()
+                    });
+                    console.log('📡 Captured platform network request:', requestUrl);
+                }
+
+                // Debug: Log all requests to see what's happening
+                if (requestUrl.includes('reaktion') || requestUrl.includes('tracking') || requestUrl.includes('conversions')) {
+                    console.log('🔍 DEBUG: Platform-related request detected:', {
+                        url: requestUrl,
+                        method: request.method(),
+                        resourceType: request.resourceType()
+                    });
+                }
+        };
+
+        // Enable request interception before navigation
+        try {
+            await scanner.page.setRequestInterception(true);
+            scanner.page.on('request', requestListener);
+            console.log('✅ Network request interception enabled');
+
+            // Also listen for responses to see what's happening
+            scanner.page.on('response', (response) => {
+                const url = response.url();
+                if (url.includes('reaktion') || url.includes('tracking') || url.includes('conversions')) {
+                    console.log('📡 Response received for platform URL:', url, response.status());
+                }
+            });
+
+        } catch (interceptError) {
+            console.warn('⚠️ Could not enable request interception:', interceptError.message);
         }
 
         // Step 2: Navigate to URL
@@ -1495,9 +1706,34 @@ export async function executeInitialScan(url, onProgress = () => {}) {
         console.log('Step 3 completed successfully');
         // Send intermediate data
         if (typeof onProgress === 'function') {
-            onProgress(3, 'Page load completed', { 
-                pageLoadSuccess: loadResult.success 
+            onProgress(3, 'Page load completed', {
+                pageLoadSuccess: loadResult.success
             });
+        }
+
+        // Step 3.5: Capture dataLayer
+        console.log('Executing step 3.5: Capture dataLayer');
+        onProgress(3, 'Capturing dataLayer...');
+        try {
+            const dataLayerSnapshot = await scanner.page.evaluate(() => {
+                try {
+                    // Capture dataLayer if it exists
+                    if (window.dataLayer && Array.isArray(window.dataLayer)) {
+                        // Deep clone to avoid any circular references
+                        return JSON.parse(JSON.stringify(window.dataLayer));
+                    }
+                    return null;
+                } catch (error) {
+                    console.warn('Error capturing dataLayer:', error.message);
+                    return null;
+                }
+            });
+
+            results.dataLayer = dataLayerSnapshot;
+            console.log('✅ DataLayer captured:', dataLayerSnapshot ? `${dataLayerSnapshot.length} events` : 'Not found');
+        } catch (error) {
+            console.warn('Failed to capture dataLayer:', error.message);
+            results.dataLayer = null;
         }
 
         // Step 4: Accept Cookies
@@ -1806,13 +2042,18 @@ export async function executeInitialScan(url, onProgress = () => {}) {
         });
 
         // Step 8: Scan for Marketing Pixels
-        console.log('Executing step 8: Scan for marketing pixels');
-        onProgress(8, 'Scanning for Meta Pixel, TikTok, LinkedIn, and Google Ads...');
+        console.log('Executing step 8: Scan for marketing pixels and platforms');
+        onProgress(8, 'Scanning for Meta Pixel, TikTok, LinkedIn, Google Ads, and platforms...');
         try {
             // Get HTML content for pixel scanning
             const htmlResult = await scanner.getPageHTML();
             const htmlContent = htmlResult.success ? htmlResult.data : (results.pageInfo?.html || '');
-            
+
+            // Give more time for requests to be captured after page load
+            console.log('⏳ Waiting for network requests to be captured...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log(`📊 Total network requests captured so far: ${networkRequests.length}`);
+
             // Create pageEvaluate function for network monitoring
             const pageEvaluate = async (fn) => {
                 if (!scanner.page) {
@@ -1824,8 +2065,9 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             console.log('Importing pixel scanner module...');
             const { scanForPixels } = await import('@/lib/pixel-scanner');
             console.log('Pixel scanner module imported successfully');
-            
-            const pixelResult = await scanForPixels(htmlContent, url, pageEvaluate);
+
+            console.log(`Passing ${networkRequests.length} captured network requests to pixel scanner`);
+            const pixelResult = await scanForPixels(htmlContent, url, pageEvaluate, networkRequests);
             console.log('Pixel scan result:', JSON.stringify(pixelResult, null, 2));
 
             // Store pixel detection results
@@ -1946,6 +2188,23 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             };
         }
 
+        // Check for platform-based server-side tracking
+        if (results.pixelInfo?.platforms) {
+            const platforms = results.pixelInfo.platforms;
+            const detectedPlatforms = [];
+
+            if (platforms.reaktion.found) detectedPlatforms.push('Reaktion');
+            if (platforms.profitmetrics.found) detectedPlatforms.push('Profitmetrics');
+            if (platforms.triplewhale.found) detectedPlatforms.push('Triplewhale');
+
+            if (detectedPlatforms.length > 0) {
+                results.serverSideTracking = true;
+                results.serverSideTrackingPlatform = detectedPlatforms[0]; // Primary platform
+                results.serverSideTrackingPlatforms = detectedPlatforms; // All detected platforms
+                console.log('✅ Server-side tracking detected via platform detection:', detectedPlatforms);
+            }
+        }
+
         results.steps.push({
             id: 8,
             status: 'completed',
@@ -2006,6 +2265,18 @@ export async function executeInitialScan(url, onProgress = () => {}) {
     } finally {
         // Cleanup
         console.log('Cleaning up scanner...');
+
+        // Clean up network monitoring
+        try {
+            if (scanner.page && requestListener) {
+                scanner.page.off('request', requestListener);
+                await scanner.page.setRequestInterception(false);
+                console.log('Network request interception cleaned up');
+            }
+        } catch (cleanupError) {
+            console.warn('Could not clean up network monitoring:', cleanupError.message);
+        }
+
         await scanner.cleanup();
         console.log('Scanner cleanup completed');
     }

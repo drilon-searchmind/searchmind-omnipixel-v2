@@ -4,13 +4,14 @@
  */
 
 /**
- * Scan HTML content and network requests for marketing pixels
+ * Scan HTML content and network requests for marketing pixels and platforms
  * @param {string} html - HTML content to scan
  * @param {string} baseUrl - Base URL of the page
  * @param {Function} pageEvaluate - Function to evaluate code in browser context (for network monitoring)
+ * @param {Array} networkRequests - Array of captured network requests for platform detection
  * @returns {Promise<Object>} Pixel detection results
  */
-export async function scanForPixels(html, baseUrl, pageEvaluate) {
+export async function scanForPixels(html, baseUrl, pageEvaluate, networkRequests = []) {
     const results = {
         meta: {
             found: false,
@@ -35,6 +36,20 @@ export async function scanForPixels(html, baseUrl, pageEvaluate) {
             conversionIds: [],
             conversionId: null,
             methods: []
+        },
+        platforms: {
+            reaktion: {
+                found: false,
+                methods: []
+            },
+            profitmetrics: {
+                found: false,
+                methods: []
+            },
+            triplewhale: {
+                found: false,
+                methods: []
+            }
         }
     };
 
@@ -255,6 +270,85 @@ export async function scanForPixels(html, baseUrl, pageEvaluate) {
             }
         }
 
+        // 5. Platform Detection (Reaktion, Profitmetrics, Triplewhale)
+        // Reaktion Detection
+        const reaktionPatterns = [
+            /app\.reaktion\.com/i,
+            /reaktion\.com\/scripts/i,
+            /reaktion\.com\/assets/i,
+            /reaktion.*analytics/i,
+            /window\.reaktion/i,
+            /reaktion.*tracking/i,
+            /reaktion.*store/i
+        ];
+        reaktionPatterns.forEach(pattern => {
+            if (pattern.test(html) && !results.platforms.reaktion.found) {
+                results.platforms.reaktion.found = true;
+                results.platforms.reaktion.methods.push('script-pattern');
+            }
+        });
+
+        // Profitmetrics Detection
+        const profitmetricsPatterns = [
+            /profitmetrics\.io/i,
+            /profitmetrics.*script/i,
+            /profitmetrics.*analytics/i,
+            /window\.profitmetrics/i,
+            /profitmetrics.*tracking/i
+        ];
+        profitmetricsPatterns.forEach(pattern => {
+            if (pattern.test(html) && !results.platforms.profitmetrics.found) {
+                results.platforms.profitmetrics.found = true;
+                results.platforms.profitmetrics.methods.push('script-pattern');
+            }
+        });
+
+        // Triplewhale Detection
+        const triplewhalePatterns = [
+            /triplewhale\.com/i,
+            /triplewhale.*script/i,
+            /triplewhale.*analytics/i,
+            /window\.triplewhale/i,
+            /triplewhale.*tracking/i,
+            /triplewhale.*pixel/i
+        ];
+        triplewhalePatterns.forEach(pattern => {
+            if (pattern.test(html) && !results.platforms.triplewhale.found) {
+                results.platforms.triplewhale.found = true;
+                results.platforms.triplewhale.methods.push('script-pattern');
+            }
+        });
+
+        // Check network requests for platform detection
+        if (networkRequests && networkRequests.length > 0) {
+            console.log('Analyzing', networkRequests.length, 'network requests for platform detection');
+
+            networkRequests.forEach(request => {
+                const url = request.url.toLowerCase();
+
+                // Reaktion detection via network requests
+                if (url.includes('reaktion.com') && !results.platforms.reaktion.found) {
+                    results.platforms.reaktion.found = true;
+                    results.platforms.reaktion.methods.push('network-request');
+                    console.log('Reaktion detected via network request:', request.url);
+                }
+
+                // Profitmetrics detection via network requests
+                if (url.includes('profitmetrics.io') && !results.platforms.profitmetrics.found) {
+                    results.platforms.profitmetrics.found = true;
+                    results.platforms.profitmetrics.methods.push('network-request');
+                    console.log('Profitmetrics detected via network request:', request.url);
+                }
+
+                // Triplewhale detection via network requests
+                if (url.includes('triplewhale.com') && !results.platforms.triplewhale.found) {
+                    results.platforms.triplewhale.found = true;
+                    results.platforms.triplewhale.methods.push('network-request');
+                    console.log('Triplewhale detected via network request:', request.url);
+                }
+            });
+        }
+
         // Set primary IDs (first found)
         if (results.meta.pixelIds.length > 0) {
             results.meta.pixelId = results.meta.pixelIds[0];
@@ -277,7 +371,12 @@ export async function scanForPixels(html, baseUrl, pageEvaluate) {
                         meta: [],
                         tiktok: [],
                         linkedin: [],
-                        googleAds: []
+                        googleAds: [],
+                        platforms: {
+                            reaktion: false,
+                            profitmetrics: false,
+                            triplewhale: false
+                        }
                     };
 
                     // Check window objects for pixel initialization
@@ -346,6 +445,29 @@ export async function scanForPixels(html, baseUrl, pageEvaluate) {
                         }
                     }
 
+                    // Platform Detection - Check for global objects
+                    // Reaktion
+                    if (typeof window.reaktion !== 'undefined' ||
+                        (window.dataLayer && Array.isArray(window.dataLayer) &&
+                         window.dataLayer.some(item => item && item.reaktion))) {
+                        detected.platforms.reaktion = true;
+                    }
+
+                    // Profitmetrics
+                    if (typeof window.profitmetrics !== 'undefined' ||
+                        (window.dataLayer && Array.isArray(window.dataLayer) &&
+                         window.dataLayer.some(item => item && item.profitmetrics))) {
+                        detected.platforms.profitmetrics = true;
+                    }
+
+                    // Triplewhale
+                    if (typeof window.triplewhale !== 'undefined' ||
+                        typeof window.Triplewhale !== 'undefined' ||
+                        (window.dataLayer && Array.isArray(window.dataLayer) &&
+                         window.dataLayer.some(item => item && (item.triplewhale || item.Triplewhale)))) {
+                        detected.platforms.triplewhale = true;
+                    }
+
                     return detected;
                 });
 
@@ -395,6 +517,45 @@ export async function scanForPixels(html, baseUrl, pageEvaluate) {
                 if (results.googleAds.conversionIds.length > 0 && !results.googleAds.conversionId) {
                     results.googleAds.conversionId = results.googleAds.conversionIds[0];
                 }
+
+                // Merge platform network detection results
+                if (networkPixels.platforms.reaktion && !results.platforms.reaktion.found) {
+                    results.platforms.reaktion.found = true;
+                    results.platforms.reaktion.methods.push('network-window-object');
+                }
+                if (networkPixels.platforms.profitmetrics && !results.platforms.profitmetrics.found) {
+                    results.platforms.profitmetrics.found = true;
+                    results.platforms.profitmetrics.methods.push('network-window-object');
+                }
+                if (networkPixels.platforms.triplewhale && !results.platforms.triplewhale.found) {
+                    results.platforms.triplewhale.found = true;
+                    results.platforms.triplewhale.methods.push('network-window-object');
+                }
+
+                // Also check networkRequests parameter if provided
+                if (networkRequests && networkRequests.length > 0) {
+                    networkRequests.forEach(request => {
+                        const url = request.url.toLowerCase();
+
+                        // Reaktion detection via network requests
+                        if (url.includes('reaktion.com') && !results.platforms.reaktion.found) {
+                            results.platforms.reaktion.found = true;
+                            results.platforms.reaktion.methods.push('network-request');
+                        }
+
+                        // Profitmetrics detection via network requests
+                        if (url.includes('profitmetrics.io') && !results.platforms.profitmetrics.found) {
+                            results.platforms.profitmetrics.found = true;
+                            results.platforms.profitmetrics.methods.push('network-request');
+                        }
+
+                        // Triplewhale detection via network requests
+                        if (url.includes('triplewhale.com') && !results.platforms.triplewhale.found) {
+                            results.platforms.triplewhale.found = true;
+                            results.platforms.triplewhale.methods.push('network-request');
+                        }
+                    });
+                }
             } catch (error) {
                 console.warn('Network pixel detection failed:', error.message);
             }
@@ -403,6 +564,18 @@ export async function scanForPixels(html, baseUrl, pageEvaluate) {
     } catch (error) {
         console.error('Pixel scanning error:', error);
     }
+
+    console.log('✅ Pixel and platform scanning completed:', {
+        meta: results.meta.found ? results.meta.pixelIds : 'Not found',
+        tiktok: results.tiktok.found ? results.tiktok.pixelIds : 'Not found',
+        linkedin: results.linkedin.found ? results.linkedin.pixelIds : 'Not found',
+        googleAds: results.googleAds.found ? results.googleAds.conversionIds : 'Not found',
+        platforms: {
+            reaktion: results.platforms.reaktion.found,
+            profitmetrics: results.platforms.profitmetrics.found,
+            triplewhale: results.platforms.triplewhale.found
+        }
+    });
 
     return results;
 }

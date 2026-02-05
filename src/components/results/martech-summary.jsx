@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { FaGoogle, FaFacebook, FaTag, FaChartLine, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaGoogle, FaFacebook, FaTag, FaChartLine, FaChevronDown, FaChevronUp, FaDatabase } from "react-icons/fa";
 
 export function MartechSummary({ results }) {
     const [isExpanded, setIsExpanded] = useState(false);
     const tagstackInfo = results.tagstackInfo;
     const marketingScripts = results.marketingScripts || {};
+    const platforms = marketingScripts.platforms || {};
 
     if (!tagstackInfo) {
         return null;
@@ -14,6 +15,33 @@ export function MartechSummary({ results }) {
 
     // Build list of detected technologies
     const technologies = [];
+
+    // Add detected platforms first (they get priority display)
+    const detectedPlatforms = [];
+    if (platforms.reaktion?.found) {
+        detectedPlatforms.push({
+            name: 'Reaktion',
+            icon: FaChartLine,
+            priority: true,
+            color: 'bg-blue-500'
+        });
+    }
+    if (platforms.profitmetrics?.found) {
+        detectedPlatforms.push({
+            name: 'Profitmetrics',
+            icon: FaChartLine,
+            priority: true,
+            color: 'bg-green-500'
+        });
+    }
+    if (platforms.triplewhale?.found) {
+        detectedPlatforms.push({
+            name: 'Triplewhale',
+            icon: FaChartLine,
+            priority: true,
+            color: 'bg-purple-500'
+        });
+    }
 
     // GTM Container
     if (marketingScripts.gtm?.found) {
@@ -136,6 +164,43 @@ export function MartechSummary({ results }) {
 
     return (
         <div id="martech-summary" className="space-y-8">
+            {/* Prominent Platform Display */}
+            {detectedPlatforms.length > 0 && (
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                            <FaTag className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="text-xl font-medium text-blue-900 dark:text-blue-100">
+                            Advanced Analytics Platforms Detected
+                        </h3>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {detectedPlatforms.map((platform, index) => {
+                            const Icon = platform.icon;
+                            return (
+                                <div
+                                    key={index}
+                                    className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-lg shadow-sm"
+                                >
+                                    <div className={`w-10 h-10 ${platform.color} rounded-full flex items-center justify-center`}>
+                                        <Icon className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold text-gray-900 dark:text-white">
+                                            {platform.name}
+                                        </div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                            Advanced tracking platform
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-2">
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
