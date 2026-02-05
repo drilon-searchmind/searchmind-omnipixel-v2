@@ -1095,6 +1095,14 @@ function ResultsContent() {
         }
 
         // Category 5: Marketing Pixels (20 points max - combined check)
+        // Check how many of the 4 main pixels are present (always calculate for logging)
+        const pixelsFound = [
+            marketingScripts.meta?.found,
+            marketingScripts.tiktok?.found,
+            marketingScripts.linkedin?.found,
+            marketingScripts.googleAds?.found
+        ].filter(Boolean).length;
+
         // Platforms like Reaktion typically include all marketing pixels, so award full points when platforms are detected
         if (platformCount > 0) {
             // Award maximum points (20) when platforms are detected - they handle all marketing scripts
@@ -1102,14 +1110,6 @@ function ResultsContent() {
             trackingScore += 20;
             console.log('Marketing pixels points (20) awarded via platform detection - platforms handle all marketing scripts');
         } else {
-            // Check how many of the 4 main pixels are present
-            const pixelsFound = [
-                marketingScripts.meta?.found,
-                marketingScripts.tiktok?.found,
-                marketingScripts.linkedin?.found,
-                marketingScripts.googleAds?.found
-            ].filter(Boolean).length;
-
             // Award points based on pixel coverage (0-4 pixels = 0-20 points)
             // All 4 pixels = 20 points, 3 pixels = 15 points, 2 pixels = 10 points, 1 pixel = 5 points
             if (pixelsFound === 4) {
