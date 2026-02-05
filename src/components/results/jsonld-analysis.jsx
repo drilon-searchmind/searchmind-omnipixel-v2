@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { FaCode, FaCheckCircle, FaExclamationTriangle, FaChevronDown, FaChevronUp, FaInfoCircle } from "react-icons/fa";
+import { FaCode, FaCheckCircle, FaExclamationTriangle, FaChevronDown, FaChevronUp, FaInfoCircle, FaTag, FaFileCode, FaTags } from "react-icons/fa";
 
 export function JsonLdAnalysis({ results }) {
     const jsonLdInfo = results.jsonLdInfo;
     const [expandedSchemas, setExpandedSchemas] = useState({});
     const [expandedScripts, setExpandedScripts] = useState({});
+    const [expandedTypes, setExpandedTypes] = useState({});
 
     if (!jsonLdInfo || !jsonLdInfo.found) {
         return (
@@ -45,6 +46,13 @@ export function JsonLdAnalysis({ results }) {
         }));
     };
 
+    const toggleType = (type) => {
+        setExpandedTypes(prev => ({
+            ...prev,
+            [type]: !prev[type]
+        }));
+    };
+
     // Group schemas by type
     const schemasByType = {};
     jsonLdInfo.schemas.forEach((schema, idx) => {
@@ -56,34 +64,46 @@ export function JsonLdAnalysis({ results }) {
     });
 
     return (
-        <div id="jsonld-analysis" className="space-y-8">
+        <div id="jsonld-analysis" className="space-y-8 border border-border/40 bg-foreground/2 py-10 px-10 rounded mt-20 mb-20">
             <div className="space-y-2">
                 <div className="flex items-center gap-2">
                     <FaCode className="w-5 h-5 text-foreground/50" />
                     <h2 className="text-2xl font-light text-foreground">JSON-LD Structured Data</h2>
                 </div>
                 <p className="text-sm text-foreground/50">
-                    Found {jsonLdInfo.schemas.length} schema(s) with {jsonLdInfo.types.length} unique type(s)
+                    Found <b>{jsonLdInfo.schemas.length}</b> schema(s) with <b>{jsonLdInfo.types.length}</b> unique type(s)
                 </p>
             </div>
 
             {/* Summary Stats */}
             <div className="grid gap-4 md:grid-cols-4">
-                <div className="border border-border/40 rounded p-4">
-                    <div className="text-2xl font-light text-foreground">{jsonLdInfo.scripts.length}</div>
-                    <div className="text-xs text-foreground/50 mt-1">Script Tags</div>
+                <div className="rounded p-4 bg-foreground/10">
+                    <div className="flex items-center gap-2 mb-2">
+                        <FaTag className="w-4 h-4 text-foreground/50" />
+                        <div className="text-2xl font-light text-foreground">{jsonLdInfo.scripts.length}</div>
+                    </div>
+                    <div className="text-xs text-foreground/50">Script Tags</div>
                 </div>
-                <div className="border border-border/40 rounded p-4">
-                    <div className="text-2xl font-light text-foreground">{jsonLdInfo.schemas.length}</div>
-                    <div className="text-xs text-foreground/50 mt-1">Schemas</div>
+                <div className="rounded p-4 bg-foreground/10">
+                    <div className="flex items-center gap-2 mb-2">
+                        <FaFileCode className="w-4 h-4 text-foreground/50" />
+                        <div className="text-2xl font-light text-foreground">{jsonLdInfo.schemas.length}</div>
+                    </div>
+                    <div className="text-xs text-foreground/50">Schemas</div>
                 </div>
-                <div className="border border-border/40 rounded p-4">
-                    <div className="text-2xl font-light text-foreground">{jsonLdInfo.types.length}</div>
-                    <div className="text-xs text-foreground/50 mt-1">Unique Types</div>
+                <div className="rounded p-4 bg-foreground/10">
+                    <div className="flex items-center gap-2 mb-2">
+                        <FaTags className="w-4 h-4 text-foreground/50" />
+                        <div className="text-2xl font-light text-foreground">{jsonLdInfo.types.length}</div>
+                    </div>
+                    <div className="text-xs text-foreground/50">Unique Types</div>
                 </div>
-                <div className="border border-border/40 rounded p-4">
-                    <div className="text-2xl font-light text-foreground">{jsonLdInfo.errors.length}</div>
-                    <div className="text-xs text-foreground/50 mt-1">Errors</div>
+                <div className="rounded p-4 bg-foreground/10">
+                    <div className="flex items-center gap-2 mb-2">
+                        <FaExclamationTriangle className="w-4 h-4 text-foreground/50" />
+                        <div className="text-2xl font-light text-foreground">{jsonLdInfo.errors.length}</div>
+                    </div>
+                    <div className="text-xs text-foreground/50">Errors</div>
                 </div>
             </div>
 
@@ -113,82 +133,97 @@ export function JsonLdAnalysis({ results }) {
             {/* Schemas by Type */}
             <div className="space-y-4">
                 <h3 className="text-lg font-light text-foreground">Schemas by Type</h3>
-                {Object.entries(schemasByType).map(([type, schemas]) => (
-                    <div key={type} className="border border-border/40 rounded">
-                        <div className="p-4 bg-foreground/5">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h4 className="font-light text-foreground">{type}</h4>
-                                    <p className="text-xs text-foreground/50 mt-1">
-                                        {schemas.length} schema{schemas.length !== 1 ? 's' : ''}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {schemas[0].schemaOrg && (
-                                        <span className="px-2 py-1 text-xs bg-green-500/20 text-green-600 rounded">
-                                            Schema.org
-                                        </span>
-                                    )}
-                                    {schemas[0].isValid ? (
-                                        <FaCheckCircle className="w-4 h-4 text-green-500" />
-                                    ) : (
-                                        <FaExclamationTriangle className="w-4 h-4 text-orange-500" />
-                                    )}
+                {Object.entries(schemasByType).map(([type, schemas]) => {
+                    const isTypeExpanded = expandedTypes[type];
+                    return (
+                        <div key={type} className="border border-border/40 rounded">
+                            <div 
+                                className="p-4 bg-foreground/5 cursor-pointer hover:bg-foreground/10 transition-colors"
+                                onClick={() => toggleType(type)}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <h4 className="font-light text-foreground">{type}</h4>
+                                        <p className="text-xs text-foreground/50 mt-1">
+                                            {schemas.length} schema{schemas.length !== 1 ? 's' : ''}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {schemas[0].schemaOrg && (
+                                            <span className="px-2 py-1 text-xs bg-green-500/20 text-green-600 rounded">
+                                                Schema.org
+                                            </span>
+                                        )}
+                                        {schemas[0].isValid ? (
+                                            <FaCheckCircle className="w-4 h-4 text-green-500" />
+                                        ) : (
+                                            <FaExclamationTriangle className="w-4 h-4 text-orange-500" />
+                                        )}
+                                        <div className="ml-2">
+                                            {isTypeExpanded ? (
+                                                <FaChevronUp className="w-4 h-4 text-foreground/40" />
+                                            ) : (
+                                                <FaChevronDown className="w-4 h-4 text-foreground/40" />
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="p-4 space-y-3">
-                            {schemas.map((schema, idx) => {
-                                const uniqueKey = `${schema.index}-${schema.schemaIndex}`;
-                                const isExpanded = expandedSchemas[uniqueKey];
-                                return (
-                                    <div key={idx} className="border-l-2 border-border/40 pl-4">
-                                        <div 
-                                            className="flex items-center justify-between cursor-pointer"
-                                            onClick={() => toggleSchema(uniqueKey)}
-                                        >
-                                            <div className="flex-1">
-                                                <div className="text-sm font-medium text-foreground">
-                                                    Schema #{schema.index}
-                                                    {schema.schemaIndex !== undefined && ` (${schema.schemaIndex + 1})`}
+                            {isTypeExpanded && (
+                                <div className="p-4 space-y-3">
+                                    {schemas.map((schema, idx) => {
+                                        const uniqueKey = `${schema.index}-${schema.schemaIndex}`;
+                                        const isExpanded = expandedSchemas[uniqueKey];
+                                        return (
+                                            <div key={idx} className="border-l-2 border-border/40 pl-4">
+                                                <div 
+                                                    className="flex items-center justify-between cursor-pointer"
+                                                    onClick={() => toggleSchema(uniqueKey)}
+                                                >
+                                                    <div className="flex-1">
+                                                        <div className="text-sm font-medium text-foreground">
+                                                            Schema #{schema.index}
+                                                            {schema.schemaIndex !== undefined && ` (${schema.schemaIndex + 1})`}
+                                                        </div>
+                                                        <div className="text-xs text-foreground/50 mt-1">
+                                                            {schema.context && (
+                                                                <span>Context: {schema.context}</span>
+                                                            )}
+                                                            {schema.id && (
+                                                                <span className="ml-2">ID: {schema.id}</span>
+                                                            )}
+                                                        </div>
+                                                        {schema.properties.length > 0 && (
+                                                            <div className="text-xs text-foreground/40 mt-1">
+                                                                Properties: {schema.properties.slice(0, 5).join(', ')}
+                                                                {schema.properties.length > 5 && ` +${schema.properties.length - 5} more`}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="ml-4">
+                                                        {isExpanded ? (
+                                                            <FaChevronUp className="w-4 h-4 text-foreground/40" />
+                                                        ) : (
+                                                            <FaChevronDown className="w-4 h-4 text-foreground/40" />
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="text-xs text-foreground/50 mt-1">
-                                                    {schema.context && (
-                                                        <span>Context: {schema.context}</span>
-                                                    )}
-                                                    {schema.id && (
-                                                        <span className="ml-2">ID: {schema.id}</span>
-                                                    )}
-                                                </div>
-                                                {schema.properties.length > 0 && (
-                                                    <div className="text-xs text-foreground/40 mt-1">
-                                                        Properties: {schema.properties.slice(0, 5).join(', ')}
-                                                        {schema.properties.length > 5 && ` +${schema.properties.length - 5} more`}
+                                                {isExpanded && (
+                                                    <div className="mt-3 pt-3 border-t border-border/40">
+                                                        <div className="text-xs text-foreground/50 mb-2">Full JSON Structure:</div>
+                                                        <pre className="text-xs font-mono bg-foreground/5 p-3 rounded overflow-x-auto">
+                                                            {JSON.stringify(schema.raw, null, 2)}
+                                                        </pre>
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="ml-4">
-                                                {isExpanded ? (
-                                                    <FaChevronUp className="w-4 h-4 text-foreground/40" />
-                                                ) : (
-                                                    <FaChevronDown className="w-4 h-4 text-foreground/40" />
-                                                )}
-                                            </div>
-                                        </div>
-                                        {isExpanded && (
-                                            <div className="mt-3 pt-3 border-t border-border/40">
-                                                <div className="text-xs text-foreground/50 mb-2">Full JSON Structure:</div>
-                                                <pre className="text-xs font-mono bg-foreground/5 p-3 rounded overflow-x-auto">
-                                                    {JSON.stringify(schema.raw, null, 2)}
-                                                </pre>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Raw Scripts */}
