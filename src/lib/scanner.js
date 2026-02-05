@@ -232,6 +232,140 @@ class WebsiteScanner {
     }
 
     /**
+     * Scan for JSON-LD structured data (application/ld+json)
+     * Extracts and validates JSON-LD scripts from the page
+     */
+    async scanJsonLd() {
+        try {
+            if (!this.page) {
+                return {
+                    success: false,
+                    message: 'No page loaded'
+                };
+            }
+
+            console.log('Scanning for JSON-LD structured data...');
+
+            const jsonLdData = await this.page.evaluate(() => {
+                const results = {
+                    found: false,
+                    scripts: [],
+                    schemas: [],
+                    types: [],
+                    errors: []
+                };
+
+                // Find all script tags with type="application/ld+json"
+                const jsonLdScripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+
+                if (jsonLdScripts.length === 0) {
+                    return results;
+                }
+
+                results.found = true;
+
+                jsonLdScripts.forEach((script, index) => {
+                    try {
+                        const textContent = script.textContent || script.innerHTML || '';
+                        
+                        if (!textContent.trim()) {
+                            return;
+                        }
+
+                        // Parse JSON-LD content
+                        let parsed;
+                        try {
+                            parsed = JSON.parse(textContent);
+                        } catch (parseError) {
+                            results.errors.push({
+                                index: index,
+                                error: `JSON parse error: ${parseError.message}`,
+                                content: textContent.substring(0, 200) // First 200 chars for debugging
+                            });
+                            return;
+                        }
+
+                        // Handle both single objects and arrays
+                        const schemas = Array.isArray(parsed) ? parsed : [parsed];
+
+                        schemas.forEach((schema, schemaIndex) => {
+                            // Extract schema information
+                            const schemaInfo = {
+                                index: index,
+                                schemaIndex: schemaIndex,
+                                type: schema['@type'] || 'Unknown',
+                                context: schema['@context'] || null,
+                                id: schema['@id'] || null,
+                                raw: schema,
+                                properties: Object.keys(schema).filter(key => !key.startsWith('@')),
+                                isValid: true
+                            };
+
+                            // Validate that it's actually JSON-LD (should have @context or @type)
+                            if (!schema['@context'] && !schema['@type']) {
+                                schemaInfo.isValid = false;
+                                schemaInfo.validationError = 'Missing @context or @type';
+                            }
+
+                            // Check for common Schema.org types
+                            if (schema['@context'] && typeof schema['@context'] === 'string') {
+                                if (schema['@context'].includes('schema.org')) {
+                                    schemaInfo.schemaOrg = true;
+                                }
+                            }
+
+                            results.schemas.push(schemaInfo);
+                            results.types.push(schemaInfo.type);
+
+                            // Store full script data
+                            results.scripts.push({
+                                index: index,
+                                type: script.type,
+                                content: textContent,
+                                parsed: schema,
+                                schemaInfo: schemaInfo
+                            });
+                        });
+                    } catch (error) {
+                        results.errors.push({
+                            index: index,
+                            error: `Processing error: ${error.message}`
+                        });
+                    }
+                });
+
+                // Remove duplicate types
+                results.types = [...new Set(results.types)];
+
+                return results;
+            });
+
+            console.log(`Found ${jsonLdData.schemas.length} JSON-LD schema(s) with ${jsonLdData.types.length} unique type(s)`);
+            if (jsonLdData.errors.length > 0) {
+                console.warn(`Found ${jsonLdData.errors.length} JSON-LD parsing error(s)`);
+            }
+
+            return {
+                success: true,
+                data: jsonLdData
+            };
+        } catch (error) {
+            console.error('Error scanning JSON-LD:', error);
+            return {
+                success: false,
+                message: `Failed to scan JSON-LD: ${error.message}`,
+                data: {
+                    found: false,
+                    scripts: [],
+                    schemas: [],
+                    types: [],
+                    errors: []
+                }
+            };
+        }
+    }
+
+    /**
      * Clean up browser resources
      */
     async cleanup() {
@@ -1816,6 +1950,50 @@ export async function executeInitialScan(url, onProgress = () => {}) {
             id: 8,
             status: 'completed',
             result: { success: true, message: 'Pixel scanning completed' }
+        });
+
+        // Step 9: Scan for JSON-LD Structured Data
+        console.log('Executing step 9: Scan for JSON-LD structured data');
+        onProgress(9, 'Scanning for JSON-LD structured data...');
+        try {
+            const jsonLdResult = await scanner.scanJsonLd();
+            if (jsonLdResult.success) {
+                results.jsonLdInfo = jsonLdResult.data;
+                console.log('✅ JSON-LD scanning completed:', {
+                    found: jsonLdResult.data.found,
+                    schemas: jsonLdResult.data.schemas.length,
+                    types: jsonLdResult.data.types.length,
+                    errors: jsonLdResult.data.errors.length
+                });
+                // Send intermediate data
+                if (typeof onProgress === 'function') {
+                    onProgress(9, 'JSON-LD scanning completed', { jsonLdInfo: results.jsonLdInfo });
+                }
+            } else {
+                console.warn('Failed to scan JSON-LD:', jsonLdResult.message);
+                results.jsonLdInfo = {
+                    found: false,
+                    scripts: [],
+                    schemas: [],
+                    types: [],
+                    errors: []
+                };
+            }
+        } catch (error) {
+            console.error('JSON-LD scanning error:', error);
+            results.jsonLdInfo = {
+                found: false,
+                scripts: [],
+                schemas: [],
+                types: [],
+                errors: []
+            };
+        }
+
+        results.steps.push({
+            id: 9,
+            status: 'completed',
+            result: { success: true, message: 'JSON-LD scanning completed' }
         });
 
         results.success = true;

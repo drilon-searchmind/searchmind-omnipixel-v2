@@ -15,7 +15,8 @@ const SCAN_STEPS = [
     { id: 6, title: "Scanning GTM Containers", description: "Detecting Google Tag Manager implementations" },
     { id: 7, title: "Tagstack Analysis", description: "Analyzing GTM container with Tagstack" },
     { id: 8, title: "Scanning Marketing Pixels", description: "Detecting Meta Pixel, TikTok, LinkedIn, and Google Ads" },
-    { id: 9, title: "Finalizing Results", description: "Preparing scan results" },
+    { id: 9, title: "Scanning JSON-LD Structured Data", description: "Extracting and validating JSON-LD schemas" },
+    { id: 10, title: "Finalizing Results", description: "Preparing scan results" },
 ];
 
 function ScanContent() {
@@ -111,8 +112,8 @@ function ScanContent() {
                                     // Update scan data for info box
                                     setScanData(scanResults);
 
-                                    // Step 8: Finalizing (UI-only step)
-                                    setCurrentStep(8);
+                                    // Step 10: Finalizing (UI-only step)
+                                    setCurrentStep(10);
 
                                     // Store scan results in localStorage to avoid URL size limits
                                     // Generate a unique session ID (without "scan_" prefix to avoid duplication)

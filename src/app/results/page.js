@@ -13,7 +13,8 @@ import {
     FaCheck,
     FaServer,
     FaShieldAlt,
-    FaTachometerAlt
+    FaTachometerAlt,
+    FaCode
 } from "react-icons/fa";
 
 // Import result components
@@ -25,6 +26,7 @@ import { GTMAnalysis } from "@/components/results/gtm-analysis";
 import { PrivacyCookies } from "@/components/results/privacy-cookies";
 import { TagstackInsights } from "@/components/results/tagstack-insights";
 import { MartechSummary } from "@/components/results/martech-summary";
+import { JsonLdAnalysis } from "@/components/results/jsonld-analysis";
 
 // Table of Contents Sidebar Component
 function TableOfContents({ activeSection, onSectionClick, isMobile = false, onClose }) {
@@ -36,6 +38,7 @@ function TableOfContents({ activeSection, onSectionClick, isMobile = false, onCl
         { id: 'gtm-analysis', title: 'GTM Analysis', icon: FaGoogle },
         { id: 'tagstack-insights', title: 'Container Health', icon: FaShieldAlt },
         { id: 'martech-summary', title: 'Martech Summary', icon: FaTag },
+        { id: 'jsonld-analysis', title: 'JSON-LD Structured Data', icon: FaCode },
         { id: 'privacy-cookies', title: 'Privacy & Cookies', icon: FaShieldAlt }
     ];
 
@@ -127,6 +130,7 @@ function ResultsContent() {
             'gtm-analysis', 
             'tagstack-insights', 
             'martech-summary', 
+            'jsonld-analysis',
             'privacy-cookies'
         ];
         sections.forEach((sectionId) => {
@@ -483,6 +487,8 @@ function ResultsContent() {
                     gtmInfo: scanData.gtmInfo || null,
                     // Use Tagstack data if available
                     tagstackInfo: scanData.tagstackInfo || null,
+                    // Use JSON-LD structured data if available
+                    jsonLdInfo: scanData.jsonLdInfo || null,
                     // Use Consent Mode V2 from Tagstack, fallback to scan data
                     consentModeV2: scanData.tagstackInfo?.consentModeV2 ?? scanData.consentModeV2 ?? false,
                     // Use server-side tracking from Tagstack, fallback to scan data
@@ -1130,6 +1136,9 @@ function ResultsContent() {
 
                 {/* Martech Summary */}
                 <MartechSummary results={displayResults} />
+
+                {/* JSON-LD Structured Data */}
+                <JsonLdAnalysis results={displayResults} />
 
                 {/* Cookie Status */}
                 <PrivacyCookies results={displayResults} />
