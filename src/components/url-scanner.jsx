@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -11,25 +11,46 @@ export function UrlScanner({ className, onSubmit }) {
     const [isLoading, setIsLoading] = React.useState(false);
     const [hasBeenFocused, setHasBeenFocused] = React.useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const hasAutoScanned = React.useRef(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!url.trim()) return;
+    const startScan = React.useCallback(async (urlToScan) => {
+        if (!urlToScan?.trim()) return;
 
         setIsLoading(true);
         try {
             // Navigate to scan page with URL parameter
-            router.push(`/scan?url=${encodeURIComponent(url.trim())}`);
+            router.push(`/scan?url=${encodeURIComponent(urlToScan.trim())}`);
 
             // If custom onSubmit is provided, call it too
             if (onSubmit) {
-                await onSubmit(url);
+                await onSubmit(urlToScan);
             }
         } catch (error) {
             console.error("Error scanning URL:", error);
         } finally {
             setIsLoading(false);
         }
+    }, [router, onSubmit]);
+
+    // Check for customerUrl in query params and auto-start scan
+    React.useEffect(() => {
+        const customerUrl = searchParams.get("customerUrl");
+        if (customerUrl && !hasAutoScanned.current) {
+            hasAutoScanned.current = true;
+            setUrl(customerUrl);
+            // Wait 1 second then automatically start the scan
+            const timer = setTimeout(() => {
+                startScan(customerUrl);
+            }, 1000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [searchParams, startScan]);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        await startScan(url);
     };
 
     return (
