@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react";
 import { UrlScanner } from "@/components/url-scanner";
 import { HeroSection } from "@/components/home/hero-section";
 import { FeaturesSection } from "@/components/home/features-section";
@@ -23,7 +24,16 @@ export default function Home() {
 								Enter a URL to begin comprehensive website analysis
 							</p>
 						</div>
-						<UrlScanner />
+						<Suspense fallback={
+							<div className="w-full">
+								<div className="flex flex-col gap-3 sm:flex-row">
+									<div className="flex-1 h-12 bg-background border border-border/60 rounded-md animate-pulse" />
+									<div className="h-12 w-24 bg-foreground/20 rounded-md animate-pulse" />
+								</div>
+							</div>
+						}>
+							<UrlScanner />
+						</Suspense>
 						<PreviousScans />
 					</div>
 				</div>
