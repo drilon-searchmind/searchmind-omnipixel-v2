@@ -1,11 +1,6 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
 const DATABASE_NAME = 'apex-v2';
-
-if (!MONGODB_URI) {
-    throw new Error('Please define the MONGODB_URI environment variable inside .env');
-}
 
 /**
  * Global is used here to maintain a cached connection across hot reloads
@@ -19,6 +14,13 @@ if (!cached) {
 }
 
 async function connectDB() {
+    // Check for MONGODB_URI at runtime, not at module load (to avoid build-time errors)
+    const MONGODB_URI = process.env.MONGODB_URI;
+    
+    if (!MONGODB_URI) {
+        throw new Error('Please define the MONGODB_URI environment variable inside .env');
+    }
+
     if (cached.conn) {
         return cached.conn;
     }
