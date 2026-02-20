@@ -19,8 +19,17 @@ export function UrlScanner({ className, onSubmit }) {
 
         setIsLoading(true);
         try {
-            // Navigate to scan page with URL parameter
-            router.push(`/scan?url=${encodeURIComponent(urlToScan.trim())}`);
+            // Get referrer and customerId from URL params to pass through
+            const referrer = searchParams.get("referrer");
+            const customerId = searchParams.get("customerId");
+            
+            // Build scan URL with all necessary parameters
+            const params = new URLSearchParams();
+            params.set("url", urlToScan.trim());
+            if (referrer) params.set("referrer", referrer);
+            if (customerId) params.set("customerId", customerId);
+            
+            router.push(`/scan?${params.toString()}`);
 
             // If custom onSubmit is provided, call it too
             if (onSubmit) {
@@ -31,7 +40,7 @@ export function UrlScanner({ className, onSubmit }) {
         } finally {
             setIsLoading(false);
         }
-    }, [router, onSubmit]);
+    }, [router, onSubmit, searchParams]);
 
     // Check for customerUrl in query params and auto-start scan
     React.useEffect(() => {

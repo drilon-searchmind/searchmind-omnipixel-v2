@@ -23,6 +23,8 @@ function ScanContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const url = searchParams.get("url");
+    const referrer = searchParams.get("referrer");
+    const customerId = searchParams.get("customerId");
 
     const [currentStep, setCurrentStep] = useState(0);
     const [isScanning, setIsScanning] = useState(true);
@@ -220,10 +222,18 @@ function ScanContent() {
 
                                     // Wait a moment before redirecting to ensure storage is complete
                                     setTimeout(() => {
-                                        // Only pass URL and session ID in the URL, not the entire data
-                                        const resultsUrl = `/results?url=${encodeURIComponent(targetUrl)}&sessionId=${sessionId}`;
+                                        // Build results URL with all necessary parameters
+                                        const params = new URLSearchParams();
+                                        params.set("url", targetUrl);
+                                        params.set("sessionId", sessionId);
+                                        if (referrer) params.set("referrer", referrer);
+                                        if (customerId) params.set("customerId", customerId);
+                                        
+                                        const resultsUrl = `/results?${params.toString()}`;
                                         console.log('🔀 Redirecting to results page');
                                         console.log('   SessionId in URL:', sessionId);
+                                        console.log('   Referrer:', referrer);
+                                        console.log('   CustomerId:', customerId);
                                         console.log('   Results URL:', resultsUrl);
                                         
                                         // Double-check the data is still in localStorage before redirecting
