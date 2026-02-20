@@ -1,6 +1,6 @@
 # Design System
 
-A clean, minimalistic design system built with shadcn/ui and Tailwind CSS v4.
+A clean, minimalistic design system built with shadcn/ui and Tailwind CSS v4...
 
 ## Overview
 
