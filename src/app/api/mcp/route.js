@@ -6,6 +6,7 @@ import { executeInitialScan } from '@/lib/scanner';
 import { buildResults } from '@/lib/build-results';
 import { assertPublicUrl } from '@/lib/mcp/url-guard';
 import { buildScanSummary } from '@/lib/mcp/scan-summary';
+import { getSetupOverview, getSetupDetails } from '@/lib/reference-setups';
 import { calculateScores } from '@/app/results/utils/score-calculator';
 import connectDB from '@/lib/mongodb';
 import CustomerTrackingScanScores from '@/models/CustomerTrackingScanScores';
@@ -101,12 +102,60 @@ const handler = createMcpHandler(
                 }
             }
         );
+
+        server.registerTool(
+            'list_reference_setups',
+            {
+                title: 'List Searchmind reference GTM setups',
+                description:
+                    'Lists the reference GTM web and server (sGTM) container setups Searchmind uses as best practice, ' +
+                    'with the platforms each container covers and the ruleset prefix (e.g. STP) used in the audit ruleset.',
+                inputSchema: z.object({}),
+            },
+            async () => ({
+                content: [{ type: 'text', text: JSON.stringify(getSetupOverview(), null, 2) }],
+            })
+        );
+
+        server.registerTool(
+            'get_reference_setup',
+            {
+                title: 'Get a reference GTM setup',
+                description:
+                    'Returns a readable digest of a reference GTM setup: tags (platform, event, triggers, consent), ' +
+                    'triggers with their conditions, variables, server clients and transformations, plus an event matrix ' +
+                    'showing which platform events fire on each trigger. Filter by platform to keep the response small, ' +
+                    'and set includeParameters to see exact tag settings such as event_id deduplication or user data fields.',
+                inputSchema: z.object({
+                    setupId: z.string().describe('Setup id from list_reference_setups, e.g. stape-ecom-cmp'),
+                    container: z.enum(['web', 'server']).optional().describe('Only the web or the server container. Omit for both.'),
+                    platform: z
+                        .string()
+                        .optional()
+                        .describe('Only one platform, e.g. meta, ga4, google_ads, tiktok, snapchat, pinterest, linkedin, reddit, klaviyo, microsoft_ads, data_tag, consent'),
+                    includeParameters: z
+                        .boolean()
+                        .optional()
+                        .describe('Include each tag\'s full settings. Use together with platform.'),
+                }),
+            },
+            async ({ setupId, container, platform, includeParameters }) => {
+                try {
+                    const details = getSetupDetails(setupId, { container, platform, includeParameters });
+                    return { content: [{ type: 'text', text: JSON.stringify(details, null, 2) }] };
+                } catch (error) {
+                    return errorResult(error.message);
+                }
+            }
+        );
     },
     {
-        serverInfo: { name: 'omnipixel', version: '2.0.0' },
+        serverInfo: { name: 'omnipixel', version: '2.1.0' },
         instructions:
-            'Omnipixel scans websites for marketing tracking, consent and performance. ' +
-            'Call scan_website with a full URL. Scores are 0-100, higher is better.',
+            'Omnipixel scans websites for marketing tracking, consent and performance, and holds Searchmind reference GTM/sGTM setups. ' +
+            'Call scan_website with a full URL. Scores are 0-100, higher is better. ' +
+            'Before recommending a tracking setup, call list_reference_setups and get_reference_setup (filtered by platform) ' +
+            'and base recommendations on the reference.',
     }
 );
 

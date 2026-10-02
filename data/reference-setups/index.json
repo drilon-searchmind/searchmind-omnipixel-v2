@@ -1,0 +1,14 @@
+[
+  {
+    "id": "stape-ecom-cmp",
+    "name": "Stape e-commerce with CMP (web + server GTM)",
+    "source": "Stape Setup Wizard templates, sanitized",
+    "description": "Searchmind reference for e-commerce sites with a consent management platform. The web container sends GA4 (via server_container_url) and a Stape Data Tag to a server container on a Stape custom domain. Browser pixels and server-side Conversion APIs share one Unique Event ID for deduplication. Every tag waits for the Stape consent listener event before firing.",
+    "useWhen": "E-commerce site (Shopify, WooCommerce or custom) using the Stape data layer events (*_stape) and a CMP that sets Google Consent Mode V2.",
+    "rulesetPrefix": "STP",
+    "containers": {
+      "web": "stape-ecom-cmp/web.json",
+      "server": "stape-ecom-cmp/server.json"
+    }
+  }
+]
