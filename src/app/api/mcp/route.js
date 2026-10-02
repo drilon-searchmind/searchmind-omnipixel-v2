@@ -7,6 +7,7 @@ import { buildResults } from '@/lib/build-results';
 import { assertPublicUrl } from '@/lib/mcp/url-guard';
 import { buildScanSummary } from '@/lib/mcp/scan-summary';
 import { getSetupOverview, getSetupDetails } from '@/lib/reference-setups';
+import { getLiveContainer, crossCheckScanIds } from '@/lib/live-container';
 import { calculateScores } from '@/app/results/utils/score-calculator';
 import connectDB from '@/lib/mongodb';
 import CustomerTrackingScanScores from '@/models/CustomerTrackingScanScores';
@@ -16,12 +17,40 @@ export const dynamic = 'force-dynamic';
 
 // Each scan launches its own Chromium instance, so cap parallel scans to protect the container's memory.
 const MAX_CONCURRENT_SCANS = Number(process.env.OMNIPIXEL_MCP_MAX_SCANS) || 2;
+const SCAN_CACHE_TTL_MS = 30 * 60 * 1000;
 let activeScans = 0;
+const scanCache = new Map();
 
 const errorResult = (message) => ({
     isError: true,
     content: [{ type: 'text', text: message }],
 });
+
+const jsonResult = (value) => ({
+    content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+});
+
+async function runScan(targetUrl, { reuse = false } = {}) {
+    const cached = scanCache.get(targetUrl);
+    if (reuse && cached && Date.now() - cached.at < SCAN_CACHE_TTL_MS) return cached;
+
+    if (activeScans >= MAX_CONCURRENT_SCANS) {
+        throw new Error(`Omnipixel is already running ${activeScans} scan(s). Try again in a minute.`);
+    }
+    activeScans++;
+    try {
+        const scanData = await executeInitialScan(targetUrl);
+        if (!scanData.success) throw new Error(`Scan failed: ${scanData.error || 'unknown error'}`);
+
+        const results = buildResults(scanData, targetUrl);
+        const scores = calculateScores(results);
+        const entry = { at: Date.now(), results, scores, summary: buildScanSummary(results, scores) };
+        scanCache.set(targetUrl, entry);
+        return entry;
+    } finally {
+        activeScans--;
+    }
+}
 
 async function saveScores(customerId, scores) {
     await connectDB();
@@ -66,20 +95,9 @@ const handler = createMcpHandler(
                     return errorResult(`Invalid customerId: ${customerId}`);
                 }
 
-                if (activeScans >= MAX_CONCURRENT_SCANS) {
-                    return errorResult(`Omnipixel is already running ${activeScans} scan(s). Try again in a minute.`);
-                }
-
-                activeScans++;
                 try {
-                    const scanData = await executeInitialScan(targetUrl);
-                    if (!scanData.success) {
-                        return errorResult(`Scan failed: ${scanData.error || 'unknown error'}`);
-                    }
-
-                    const results = buildResults(scanData, targetUrl);
-                    const scores = calculateScores(results);
-                    const summary = buildScanSummary(results, scores);
+                    const { scores, summary: cachedSummary } = await runScan(targetUrl);
+                    const summary = { ...cachedSummary };
 
                     if (customerId) {
                         try {
@@ -91,15 +109,83 @@ const handler = createMcpHandler(
                         }
                     }
 
-                    return {
-                        content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
-                    };
+                    return jsonResult(summary);
                 } catch (error) {
                     console.error('MCP scan error:', error);
-                    return errorResult(`Scan failed: ${error.message}`);
-                } finally {
-                    activeScans--;
+                    return errorResult(error.message.startsWith('Scan failed') || error.message.startsWith('Omnipixel') ? error.message : `Scan failed: ${error.message}`);
                 }
+            }
+        );
+
+        server.registerTool(
+            'get_live_container',
+            {
+                title: 'Get the live published GTM web container',
+                description:
+                    'Fetches the published GTM web container (gtm.js) and returns a digest in the same shape as get_reference_setup, ' +
+                    'so it can be diffed 1:1: eventMatrix keyed by dataLayer event, tags (type, platform, event, firesOn, consent, ' +
+                    'blockedBy, paused, pixel/measurement ids), triggers, variables, Custom HTML summaries, server container URLs, ' +
+                    'and secretsExposed (credentials published in the container). Pass url to use the containers found by a scan ' +
+                    '(reuses a scan from the last 30 minutes, else runs one) plus a cross-check of pixel IDs seen in the scan but ' +
+                    'missing from the containers. gtm.js has no tag/trigger/variable names and no server container. ' +
+                    'Large containers return an overview; use platform to get per-tag detail and includeParameters for exact settings ' +
+                    '(event ID mapping, user data fields, value/currency/transaction_id, test codes).',
+                inputSchema: z.object({
+                    url: z.string().optional().describe('Website URL. The containers found by the scan are fetched.'),
+                    containerId: z.string().optional().describe('GTM web container ID, e.g. GTM-WP9Q2FZV. Use instead of url.'),
+                    platform: z
+                        .string()
+                        .optional()
+                        .describe('Only one platform, same names as get_reference_setup: meta, ga4, google_ads, tiktok, snapchat, pinterest, linkedin, microsoft_ads, data_tag, consent, custom_html ...'),
+                    includeParameters: z.boolean().optional().describe('Include each tag\'s settings. Use together with platform.'),
+                }),
+            },
+            async ({ url, containerId, platform, includeParameters }) => {
+                if (!url && !containerId) return errorResult('Provide url or containerId.');
+
+                let scan = null;
+                let containerIds = containerId ? [containerId] : [];
+                if (url) {
+                    try {
+                        const targetUrl = await assertPublicUrl(url);
+                        scan = await runScan(targetUrl, { reuse: true });
+                    } catch (error) {
+                        return errorResult(error.message);
+                    }
+                    if (!containerId) containerIds = scan.summary.tracking.gtm.containers;
+                }
+
+                const scanContext = scan ? {
+                    url: scan.summary.url,
+                    scannedAt: scan.summary.scannedAt,
+                    scanPixels: scan.summary.tracking.pixels,
+                } : {};
+
+                if (!containerIds.length) {
+                    return jsonResult({
+                        ...scanContext,
+                        containers: {},
+                        note: 'The scan found no GTM web container on this page. Pixels seen in the scan are loaded by hard-coded code, a shop app or gtag.js.',
+                    });
+                }
+
+                const containers = {};
+                const errors = {};
+                for (const id of containerIds) {
+                    try {
+                        containers[id] = await getLiveContainer(id, { platform, includeParameters });
+                    } catch (error) {
+                        errors[id] = error.message;
+                    }
+                }
+                if (!Object.keys(containers).length && !scan) return errorResult(Object.values(errors).join('\n'));
+
+                const result = { ...scanContext, containers };
+                if (Object.keys(errors).length) result.errors = errors;
+                if (scan) {
+                    result.scanIdsNotInContainers = await crossCheckScanIds(containerIds, scan.summary.tracking.pixels);
+                }
+                return jsonResult(result);
             }
         );
 
@@ -122,9 +208,9 @@ const handler = createMcpHandler(
             {
                 title: 'Get a reference GTM setup',
                 description:
-                    'Returns a readable digest of a reference GTM setup: tags (platform, event, triggers, consent), ' +
+                    'Returns a readable digest of a reference GTM setup: tags (platform, event, firesOn trigger names, firesOnEvents, consent), ' +
                     'triggers with their conditions, variables, server clients and transformations, plus an event matrix ' +
-                    'showing which platform events fire on each trigger. Filter by platform to keep the response small, ' +
+                    'showing which platform events fire on each dataLayer event (same keys as get_live_container). Filter by platform to keep the response small, ' +
                     'and set includeParameters to see exact tag settings such as event_id deduplication or user data fields.',
                 inputSchema: z.object({
                     setupId: z.string().describe('Setup id from list_reference_setups, e.g. stape-ecom-cmp'),
@@ -150,12 +236,12 @@ const handler = createMcpHandler(
         );
     },
     {
-        serverInfo: { name: 'omnipixel', version: '2.1.0' },
+        serverInfo: { name: 'omnipixel', version: '2.2.0' },
         instructions:
-            'Omnipixel scans websites for marketing tracking, consent and performance, and holds Searchmind reference GTM/sGTM setups. ' +
-            'Call scan_website with a full URL. Scores are 0-100, higher is better. ' +
-            'Before recommending a tracking setup, call list_reference_setups and get_reference_setup (filtered by platform) ' +
-            'and base recommendations on the reference.',
+            'Omnipixel scans websites for marketing tracking, consent and performance, reads published GTM web containers, ' +
+            'and holds Searchmind reference GTM/sGTM setups. Call scan_website with a full URL, then get_live_container with the same url ' +
+            'to see how the live container is built, then get_reference_setup with the same platform filter to diff against best practice. ' +
+            'Live and reference digests share one shape; eventMatrix is keyed by dataLayer event in both.',
     }
 );
 

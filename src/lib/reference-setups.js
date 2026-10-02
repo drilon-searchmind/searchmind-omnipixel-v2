@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const DATA_DIR = path.join(process.cwd(), 'data', 'reference-setups');
 
-const BUILT_IN_TYPES = {
+export const BUILT_IN_TYPES = {
     gaawe: 'GA4 Event',
     googtag: 'Google Tag',
     baut: 'Microsoft Advertising UET',
@@ -34,12 +34,42 @@ const BUILT_IN_TRIGGERS = {
     '2147479573': 'Consent Initialization - All Pages',
 };
 
+const BUILT_IN_TRIGGER_EVENTS = {
+    '2147479553': 'gtm.js',
+    '2147479572': 'gtm.init',
+    '2147479573': 'gtm.init_consent',
+};
+
+// The dataLayer event each GTM trigger type listens to. Live gtm.js only exposes these event names, not trigger names.
+export const TRIGGER_TYPE_EVENTS = {
+    PAGEVIEW: 'gtm.js',
+    DOM_READY: 'gtm.dom',
+    WINDOW_LOADED: 'gtm.load',
+    INIT: 'gtm.init',
+    CONSENT_INIT: 'gtm.init_consent',
+    CLICK: 'gtm.click',
+    LINK_CLICK: 'gtm.linkClick',
+    FORM_SUBMISSION: 'gtm.formSubmit',
+    HISTORY_CHANGE: 'gtm.historyChange',
+    TIMER: 'gtm.timer',
+    SCROLL_DEPTH: 'gtm.scrollDepth',
+    ELEMENT_VISIBILITY: 'gtm.elementVisibility',
+    YOU_TUBE_VIDEO: 'gtm.video',
+    JS_ERROR: 'gtm.pageError',
+};
+
 const PLATFORM_ALIASES = {
     linkedin: 'linkedin',
     snap: 'snapchat',
     mads: 'microsoft_ads',
+    bing: 'microsoft_ads',
     gads: 'google_ads',
+    adwords: 'google_ads',
+    ga: 'ga4',
+    facebook: 'meta',
+    fb: 'meta',
     data_tags: 'data_tag',
+    stape: 'data_tag',
     auxiliary: 'consent',
 };
 
@@ -79,7 +109,7 @@ const simplify = (p) => p.value !== undefined ? p.value
 
 const paramsOf = (item) => Object.fromEntries((item.parameter || []).map(p => [p.key, simplify(p)]));
 
-function normalizePlatform(folderName) {
+export function normalizePlatform(folderName) {
     const key = (folderName || 'other').replace(/^\[[^\]]+\]\s*/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
     return PLATFORM_ALIASES[key] || key;
 }
@@ -126,18 +156,37 @@ function describeTrigger(trigger, ctx) {
     return `${trigger.type}${parts.length ? ` (${parts.join('; ')})` : ''}`;
 }
 
+function triggerEvents(id, ctx, seen = new Set()) {
+    if (BUILT_IN_TRIGGER_EVENTS[id]) return BUILT_IN_TRIGGER_EVENTS[id];
+    const trigger = ctx.triggersById[id];
+    if (!trigger || seen.has(id)) return ctx.triggerName(id);
+    seen.add(id);
+
+    if (trigger.type === 'TRIGGER_GROUP') {
+        return (paramsOf(trigger).triggerIds || []).map(t => triggerEvents(t, ctx, seen)).sort().join(' + ');
+    }
+    const eventFilter = [...(trigger.customEventFilter || []), ...(trigger.filter || [])]
+        .map(paramsOf)
+        .find(p => /^\{\{(_event|Event|Event Name)\}\}$/.test(p.arg0));
+    if (eventFilter) return eventFilter.arg1;
+    return TRIGGER_TYPE_EVENTS[trigger.type] || ctx.triggerName(id);
+}
+
 function describeConsent(tag) {
     const cs = tag.consentSettings;
+    // Same wording as live-container: gtm.js cannot tell "not set" from "not needed", both are "none".
     if (!cs || cs.consentStatus === 'NOT_SET') {
         const serverConsent = paramsOf(tag).adStorageConsent;
-        return serverConsent ? `server-side ad_storage consent: ${serverConsent}` : 'not set';
+        return serverConsent ? `server-side ad_storage consent: ${serverConsent}` : 'none';
     }
-    if (cs.consentStatus === 'NOT_NEEDED') return 'no additional consent required';
+    if (cs.consentStatus === 'NOT_NEEDED') return 'none';
     const types = (cs.consentType?.list || []).map(t => t.value);
     return `requires ${types.join(', ')}`;
 }
 
 function eventOf(tag, params) {
+    if (tag.type === 'googtag') return 'config';
+    if (tag.type === 'gclidw') return 'conversion_linker';
     const named = params.eventNameStandard || params.event_name_standard || params.eventName;
     const event = named && named !== 'standard'
         ? named
@@ -156,6 +205,7 @@ function digestTag(tag, ctx, includeParameters) {
         type: ctx.typeLabel(tag.type),
         event: eventOf(tag, params),
         firesOn: (tag.firingTriggerId || []).map(ctx.triggerName),
+        firesOnEvents: (tag.firingTriggerId || []).map(id => triggerEvents(id, ctx)),
         consent: describeConsent(tag),
     };
     if (tag.blockingTriggerId?.length) digest.blockedBy = tag.blockingTriggerId.map(ctx.triggerName);
@@ -174,14 +224,28 @@ function digestVariable(variable, ctx) {
     };
 }
 
-function buildEventMatrix(tags) {
+export function buildEventMatrix(tags) {
     const matrix = {};
     for (const tag of tags) {
-        for (const trigger of tag.firesOn) {
-            (matrix[trigger] ||= []).push(`${tag.platform}${tag.event ? `: ${tag.event}` : ''}`);
+        if (tag.paused) continue;
+        for (const event of tag.firesOnEvents) {
+            (matrix[event] ||= []).push(`${tag.platform}${tag.event ? `: ${tag.event}` : ''}`);
         }
     }
     return matrix;
+}
+
+export function galleryTemplateNames() {
+    const names = {};
+    for (const setup of listSetups()) {
+        for (const kind of Object.keys(setup.containers)) {
+            for (const t of loadContainer(setup.id, kind).cv.customTemplate || []) {
+                const galleryId = t.galleryReference?.galleryTemplateId;
+                if (galleryId) names[`cvt_${galleryId}`] = t.name;
+            }
+        }
+    }
+    return names;
 }
 
 function digestContainer(ctx, { platform, includeParameters }) {
